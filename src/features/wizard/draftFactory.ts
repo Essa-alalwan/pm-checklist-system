@@ -22,7 +22,7 @@ export function createEmptyLvAcMotorDraft(doneBy = ''): LvAcMotorDraft {
     reviewedBy: undefined,
     signatureDataUrl: '',
     remarks: '',
-    items: lvAcMotorTemplate.items.map((i) => ({ id: i.id, label: i.label, status: 'done' as const, note: undefined })),
+    items: lvAcMotorTemplate.items.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
     windingResistance: [
       { phase: 'R-Y', resistanceOhm: undefined, inductanceMh: undefined },
       { phase: 'Y-B', resistanceOhm: undefined, inductanceMh: undefined },
@@ -48,7 +48,7 @@ export function createEmptyGeneratorDraft(doneBy = ''): GeneratorDraft {
     reviewedBy: undefined,
     signatureDataUrl: '',
     remarks: '',
-    items: generatorTemplate.items.map((i) => ({ id: i.id, label: i.label, status: 'done' as const, note: undefined })),
+    items: generatorTemplate.items.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
     shaftGroundingBrushes: [1, 2, 3, 4].map((holderNumber) => ({ holderNumber, lengthMm: undefined })),
     brushLengths: [],
     h2PressureBar: undefined,

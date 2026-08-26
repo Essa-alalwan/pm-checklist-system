@@ -1,12 +1,13 @@
 import { clsx } from 'clsx'
-import { AlertTriangle, Check, Minus } from 'lucide-react'
+import { AlertTriangle, Check, CircleDashed, Minus } from 'lucide-react'
 import type { ChecklistItemResult, ChecklistItemStatus } from '../../types/checklist'
 
-const ICONS: Record<ChecklistItemStatus, typeof Check> = { done: Check, na: Minus, flagged: AlertTriangle }
+const ICONS: Record<ChecklistItemStatus, typeof Check> = { done: Check, na: Minus, flagged: AlertTriangle, pending: CircleDashed }
 const CLASSES: Record<ChecklistItemStatus, string> = {
   done: 'bg-done-dim text-done border-done/40',
   na: 'bg-na-dim text-na border-na/40',
   flagged: 'bg-flagged-dim text-flagged border-flagged/40',
+  pending: 'bg-surface-3 text-text-faint border-border-strong',
 }
 
 export function ChecklistItemsReadOnly({ items }: { items: ChecklistItemResult[] }) {

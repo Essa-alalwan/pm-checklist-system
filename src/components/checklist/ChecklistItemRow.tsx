@@ -22,7 +22,11 @@ export function ChecklistItemRow({ index, item, onChange }: ChecklistItemRowProp
       id={`checklist-item-${item.id}`}
       className={clsx(
         'scroll-mt-6 rounded-xl border p-4 transition-colors',
-        item.status === 'flagged' ? 'border-flagged/50 bg-flagged-dim/40' : 'border-border bg-surface',
+        item.status === 'flagged'
+          ? 'border-flagged/50 bg-flagged-dim/40'
+          : item.status === 'pending'
+            ? 'border-dashed border-border-strong bg-surface'
+            : 'border-border bg-surface',
       )}
     >
       <div className="flex items-start gap-3">
@@ -30,6 +34,9 @@ export function ChecklistItemRow({ index, item, onChange }: ChecklistItemRowProp
           {index + 1}
         </span>
         <p className="flex-1 text-sm font-medium text-text">{item.label}</p>
+        {item.status === 'pending' && (
+          <span className="shrink-0 text-xs font-medium text-text-faint">Needs a status</span>
+        )}
       </div>
 
       <div className="mt-3 sm:pl-9">

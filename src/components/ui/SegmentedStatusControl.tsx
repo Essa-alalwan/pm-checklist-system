@@ -8,13 +8,13 @@ interface SegmentedStatusControlProps {
   ariaLabel: string
 }
 
-const OPTIONS: { value: ChecklistItemStatus; label: string; icon: typeof Check }[] = [
+const OPTIONS: { value: 'done' | 'na' | 'flagged'; label: string; icon: typeof Check }[] = [
   { value: 'done', label: 'Done', icon: Check },
   { value: 'na', label: 'N/A', icon: Minus },
   { value: 'flagged', label: 'Flagged', icon: AlertTriangle },
 ]
 
-const ACTIVE_CLASSES: Record<ChecklistItemStatus, string> = {
+const ACTIVE_CLASSES: Record<'done' | 'na' | 'flagged', string> = {
   done: 'bg-done-dim text-done border-done/50 shadow-[0_0_0_1px_var(--color-done)_inset]',
   na: 'bg-na-dim text-na border-na/50 shadow-[0_0_0_1px_var(--color-na)_inset]',
   flagged: 'bg-flagged-dim text-flagged border-flagged/50 shadow-[0_0_0_1px_var(--color-flagged)_inset]',

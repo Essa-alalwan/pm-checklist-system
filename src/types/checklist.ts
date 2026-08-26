@@ -1,4 +1,4 @@
-export type ChecklistItemStatus = 'done' | 'na' | 'flagged'
+export type ChecklistItemStatus = 'pending' | 'done' | 'na' | 'flagged'
 
 export interface ChecklistItemResult {
   id: string
