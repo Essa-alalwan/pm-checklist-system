@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  technician
+  supervisor
+}
+
+enum RecordStatus {
+  submitted
+  reviewed
+}
+
+enum ItemStatus {
+  done
+  na
+  flagged
+}
+
+enum AuditAction {
+  created
+  reviewed
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  username     String   @unique
+  passwordHash String
+  role         UserRole
+  department   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdRecords ChecklistRecord[]
+  auditEvents    ChecklistAuditEvent[]
+}
+
+model ChecklistTemplate {
+  id          String   @id @default(uuid())
+  type        String   @unique
+  label       String
+  shortLabel  String
+  description String
+  createdAt   DateTime @default(now())
+
+  items   ChecklistTemplateItem[]
+  records ChecklistRecord[]
+}
+
+model ChecklistTemplateItem {
+  id         String @id @default(uuid())
+  templateId String
+  itemKey    String
+  label      String
+  sortOrder  Int
+
+  template     ChecklistTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  recordItems  ChecklistRecordItem[]
+
+  @@unique([templateId, itemKey])
+}
+
+model ChecklistRecord {
+  id                  String       @id @default(uuid())
+  templateId          String
+  kksCode             String
+  equipmentDescription String
+  date                String
+  preparedBy          String
+  doneBy              String
+  numberOfHelpers      Int
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  status              RecordStatus @default(submitted)
+  signatureDataUrl    String
+  remarks             String?
+  createdByUserId     String
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  template    ChecklistTemplate     @relation(fields: [templateId], references: [id])
+  createdBy   User                  @relation(fields: [createdByUserId], references: [id])
+  items       ChecklistRecordItem[]
+  readings    ChecklistReading[]
+  auditEvents ChecklistAuditEvent[]
+
+  @@index([kksCode])
+  @@index([doneBy])
+  @@index([date])
+  @@index([status])
+}
+
+model ChecklistRecordItem {
+  id             String     @id @default(uuid())
+  recordId       String
+  templateItemId String
+  status         ItemStatus
+  note           String?
+
+  record     ChecklistRecord       @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  templateItem ChecklistTemplateItem @relation(fields: [templateItemId], references: [id])
+
+  @@unique([recordId, templateItemId])
+}
+
+model ChecklistReading {
+  id         String  @id @default(uuid())
+  recordId   String
+  key        String
+  groupLabel String?
+  value      Decimal? @db.Decimal(12, 4)
+  unit       String?
+  sortOrder  Int
+
+  record ChecklistRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId])
+  @@index([key])
+}
+
+model ChecklistAuditEvent {
+  id            String      @id @default(uuid())
+  recordId      String
+  action        AuditAction
+  actorUserId   String
+  occurredAt    DateTime    @default(now())
+  metadata      Json?
+
+  record ChecklistRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  actor  User            @relation(fields: [actorUserId], references: [id])
+}
