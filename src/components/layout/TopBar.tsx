@@ -20,11 +20,15 @@ export function TopBar() {
   }, [])
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/70 px-4 backdrop-blur md:px-6">
+    <header className="relative flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/70 px-4 backdrop-blur md:px-6">
       <div className="md:hidden">
         <Wordmark />
       </div>
       <div className="hidden md:block" />
+
+      <p className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-sm font-semibold tracking-wide text-text-muted md:block">
+        Aldur-2 Power &amp; Water Services
+      </p>
 
       <div className="flex items-center gap-4">
         <div className="hidden text-right font-mono text-xs text-text-faint sm:block">

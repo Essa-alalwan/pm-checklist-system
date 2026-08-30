@@ -5,6 +5,7 @@ import { useSession } from '../context/SessionContext'
 import { ApiError } from '../data/apiClient'
 import { Button } from '../components/ui/Button'
 import { Field, inputClasses } from '../components/ui/Field'
+import acwaLogo from '../assets/acwa-logo.jpg'
 
 export default function LoginPage() {
   const { isAuthenticated, loading: sessionLoading, login } = useSession()
@@ -41,17 +42,9 @@ export default function LoginPage() {
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <svg viewBox="0 0 32 32" className="mb-4 size-14" aria-hidden="true">
-            <rect width="32" height="32" rx="7" fill="var(--color-surface-3)" />
-            <circle cx="16" cy="16" r="10.5" fill="none" stroke="var(--color-brand)" strokeWidth="2" />
-            <circle cx="16" cy="16" r="3" fill="var(--color-brand)" />
-            <path
-              d="M16 5.5V2.5M16 29.5V26.5M5.5 16H2.5M29.5 16H26.5"
-              stroke="var(--color-brand)"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
+          <span className="mb-4 flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-white p-2.5 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
+            <img src={acwaLogo} alt="ACWA Power" className="size-full object-contain" />
+          </span>
           <h1 className="font-mono text-lg font-semibold tracking-wide text-text">PM Logbook</h1>
           <p className="mt-1 text-sm text-text-muted">Aldur-2 Power &amp; Water Services</p>
           <p className="text-xs text-text-faint">Electrical Maintenance Department · NOMAC</p>
