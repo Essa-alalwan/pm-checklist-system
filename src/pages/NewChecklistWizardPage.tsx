@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Send } from 'lucide-react'
-import type { ChecklistType } from '../types/checklist'
-import { getTemplate, templateRegistry } from '../data/templates/registry'
+import type { ChecklistTemplate, ChecklistType } from '../types/checklist'
+import { useTemplates } from '../context/TemplatesContext'
 import {
   createEmptyGeneratorDraft,
   createEmptyLvAcMotorDraft,
@@ -14,7 +14,6 @@ import { validateItems, validateJobInfo, validateSignature } from '../features/w
 import { useDraft } from '../hooks/useDraft'
 import { useSession } from '../context/SessionContext'
 import { useCreateChecklist } from '../hooks/useCreateChecklist'
-import { generateId } from '../lib/id'
 import { Button } from '../components/ui/Button'
 import { WizardShell } from '../components/checklist/wizard/WizardShell'
 import { StepJobInfo } from '../components/checklist/wizard/StepJobInfo'
@@ -37,16 +36,16 @@ interface WizardState {
   data: ChecklistDraft
 }
 
-function WizardInner({ type }: { type: ChecklistType }) {
+function WizardInner({ template }: { template: ChecklistTemplate }) {
+  const type = template.type
   const navigate = useNavigate()
   const { name } = useSession()
-  const template = getTemplate(type)
   const { submit, submitting, error: submitError } = useCreateChecklist()
 
   const initial = useMemo<WizardState>(
     () => ({
       step: 0,
-      data: type === 'lv-ac-motor' ? createEmptyLvAcMotorDraft(name) : createEmptyGeneratorDraft(name),
+      data: type === 'lv-ac-motor' ? createEmptyLvAcMotorDraft(template.items, name) : createEmptyGeneratorDraft(template.items, name),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [type],
@@ -101,16 +100,10 @@ function WizardInner({ type }: { type: ChecklistType }) {
       setBlockingMessage(signatureError)
       return
     }
-    const record = {
-      ...data,
-      id: generateId('ck'),
-      createdAt: new Date().toISOString(),
-      status: 'submitted' as const,
-    }
     try {
-      await submit(record)
+      const created = await submit(data)
       clearDraft()
-      navigate(`/records/${record.id}`)
+      navigate(`/records/${created.id}`)
     } catch {
       // surfaced via submitError below
     }
@@ -172,10 +165,20 @@ function WizardInner({ type }: { type: ChecklistType }) {
 
 export default function NewChecklistWizardPage() {
   const { type } = useParams<{ type: string }>()
+  const { getTemplate, loading } = useTemplates()
 
-  if (!type || !(type in templateRegistry)) {
+  if (loading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="size-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" role="status" aria-label="Loading" />
+      </div>
+    )
+  }
+
+  const template = type ? getTemplate(type as ChecklistType) : undefined
+  if (!template) {
     return <Navigate to="/checklists/new" replace />
   }
 
-  return <WizardInner key={type} type={type as ChecklistType} />
+  return <WizardInner key={type} template={template} />
 }

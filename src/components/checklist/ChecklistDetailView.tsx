@@ -1,7 +1,7 @@
 import { CircleGauge, Zap } from 'lucide-react'
 import type { ChecklistRecord } from '../../types/checklist'
 import type { ChecklistDraft } from '../../features/wizard/draftFactory'
-import { getTemplate } from '../../data/templates/registry'
+import { useTemplates } from '../../context/TemplatesContext'
 import { Card, CardBody, CardHeader } from '../ui/Card'
 import { StatusPill } from '../ui/StatusPill'
 import { FlaggedCallout } from './FlaggedCallout'
@@ -20,6 +20,7 @@ function formatDateTime(iso: string) {
 }
 
 export function ChecklistDetailView({ record }: { record: DetailSource }) {
+  const { getTemplate } = useTemplates()
   const template = getTemplate(record.type)
   const Icon = record.type === 'generator' ? Zap : CircleGauge
   const status = 'status' in record ? record.status : undefined
@@ -34,7 +35,7 @@ export function ChecklistDetailView({ record }: { record: DetailSource }) {
               <Icon className="size-5" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-text-faint">{template.label}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-text-faint">{template?.label ?? record.type}</p>
               <h2 className="text-lg font-semibold text-text">{record.equipmentDescription || 'Untitled equipment'}</h2>
               <p className="mt-0.5 font-mono text-sm text-text-muted">{record.kksCode || '—'}</p>
             </div>

@@ -8,7 +8,7 @@ import { Skeleton, SkeletonCard } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
 import { getButtonClasses } from '../components/ui/buttonStyles'
 import { RecordSummaryRow } from '../components/records/RecordSummaryRow'
-import { getTemplate } from '../data/templates/registry'
+import { useTemplates } from '../context/TemplatesContext'
 
 function StatTile({
   label,
@@ -50,6 +50,7 @@ function StatTile({
 
 export default function DashboardPage() {
   const { stats, recent, loading, error } = useDashboardStats()
+  const { templates, loading: templatesLoading } = useTemplates()
   const { name } = useSession()
   const firstName = name.split(' ')[0]
 
@@ -118,12 +119,16 @@ export default function DashboardPage() {
         <div>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">Start a checklist</h2>
           <div className="flex flex-col gap-3">
-            {['lv-ac-motor', 'generator'].map((type) => {
-              const template = getTemplate(type as 'lv-ac-motor' | 'generator')
-              return (
+            {templatesLoading ? (
+              <>
+                <Skeleton className="h-16 w-full rounded-xl" />
+                <Skeleton className="h-16 w-full rounded-xl" />
+              </>
+            ) : (
+              templates.map((template) => (
                 <Link
-                  key={type}
-                  to={`/checklists/new/${type}`}
+                  key={template.type}
+                  to={`/checklists/new/${template.type}`}
                   className="group flex items-center justify-between rounded-xl border border-border bg-surface p-4 transition-colors hover:border-brand/50 hover:bg-surface-2"
                 >
                   <div>
@@ -132,8 +137,8 @@ export default function DashboardPage() {
                   </div>
                   <PlusCircle className="size-5 text-text-faint transition-colors group-hover:text-brand-strong" aria-hidden="true" />
                 </Link>
-              )
-            })}
+              ))
+            )}
           </div>
         </div>
       </div>

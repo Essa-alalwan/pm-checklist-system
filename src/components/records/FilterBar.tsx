@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { RotateCcw, Search } from 'lucide-react'
 import type { ChecklistFilters } from '../../data/repository'
-import { checklistTemplates } from '../../data/templates/registry'
+import { useTemplates } from '../../context/TemplatesContext'
 import { inputClasses } from '../ui/Field'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
@@ -13,6 +13,7 @@ interface FilterBarProps {
 const EMPTY_FILTERS: ChecklistFilters = { type: 'all', kksCode: '', technician: '', dateFrom: '', dateTo: '', onlyFlagged: false }
 
 export function FilterBar({ filters, onChange }: FilterBarProps) {
+  const { templates } = useTemplates()
   const kksId = useId()
   const techId = useId()
   const fromId = useId()
@@ -53,7 +54,7 @@ export function FilterBar({ filters, onChange }: FilterBarProps) {
             onChange={(e) => onChange({ ...filters, type: e.target.value as ChecklistFilters['type'] })}
           >
             <option value="all">All types</option>
-            {checklistTemplates.map((t) => (
+            {templates.map((t) => (
               <option key={t.type} value={t.type}>
                 {t.shortLabel}
               </option>

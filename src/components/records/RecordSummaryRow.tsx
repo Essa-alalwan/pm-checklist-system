@@ -3,13 +3,14 @@ import { ChevronRight, Zap, CircleGauge } from 'lucide-react'
 import type { ChecklistRecord } from '../../types/checklist'
 import { hasFlaggedItems } from '../../data/repository'
 import { StatusPill } from '../ui/StatusPill'
-import { getTemplate } from '../../data/templates/registry'
+import { useTemplates } from '../../context/TemplatesContext'
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 export function RecordSummaryRow({ record }: { record: ChecklistRecord }) {
+  const { getTemplate } = useTemplates()
   const flagged = hasFlaggedItems(record)
   const template = getTemplate(record.type)
   const Icon = record.type === 'generator' ? Zap : CircleGauge
@@ -28,7 +29,7 @@ export function RecordSummaryRow({ record }: { record: ChecklistRecord }) {
           <p className="truncate text-sm font-semibold text-text">{record.equipmentDescription}</p>
         </div>
         <p className="mt-0.5 truncate font-mono text-xs text-text-faint">
-          {record.kksCode} · {template.shortLabel}
+          {record.kksCode} · {template?.shortLabel ?? record.type}
         </p>
       </div>
 

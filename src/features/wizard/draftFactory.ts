@@ -1,6 +1,4 @@
-import type { GeneratorChecklist, LvAcMotorChecklist } from '../../types/checklist'
-import { generatorTemplate } from '../../data/templates/generator'
-import { lvAcMotorTemplate } from '../../data/templates/lvAcMotor'
+import type { ChecklistTemplateItemDef, GeneratorChecklist, LvAcMotorChecklist } from '../../types/checklist'
 
 export type LvAcMotorDraft = Omit<LvAcMotorChecklist, 'id' | 'createdAt' | 'status'>
 export type GeneratorDraft = Omit<GeneratorChecklist, 'id' | 'createdAt' | 'status'>
@@ -10,7 +8,7 @@ function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function createEmptyLvAcMotorDraft(doneBy = ''): LvAcMotorDraft {
+export function createEmptyLvAcMotorDraft(templateItems: ChecklistTemplateItemDef[], doneBy = ''): LvAcMotorDraft {
   return {
     type: 'lv-ac-motor',
     kksCode: '',
@@ -22,7 +20,7 @@ export function createEmptyLvAcMotorDraft(doneBy = ''): LvAcMotorDraft {
     reviewedBy: undefined,
     signatureDataUrl: '',
     remarks: '',
-    items: lvAcMotorTemplate.items.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
+    items: templateItems.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
     windingResistance: [
       { phase: 'R-Y', resistanceOhm: undefined, inductanceMh: undefined },
       { phase: 'Y-B', resistanceOhm: undefined, inductanceMh: undefined },
@@ -36,7 +34,7 @@ export function createEmptyLvAcMotorDraft(doneBy = ''): LvAcMotorDraft {
   }
 }
 
-export function createEmptyGeneratorDraft(doneBy = ''): GeneratorDraft {
+export function createEmptyGeneratorDraft(templateItems: ChecklistTemplateItemDef[], doneBy = ''): GeneratorDraft {
   return {
     type: 'generator',
     kksCode: '',
@@ -48,7 +46,7 @@ export function createEmptyGeneratorDraft(doneBy = ''): GeneratorDraft {
     reviewedBy: undefined,
     signatureDataUrl: '',
     remarks: '',
-    items: generatorTemplate.items.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
+    items: templateItems.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
     shaftGroundingBrushes: [1, 2, 3, 4].map((holderNumber) => ({ holderNumber, lengthMm: undefined })),
     brushLengths: [],
     h2PressureBar: undefined,
