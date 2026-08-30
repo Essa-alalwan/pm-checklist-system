@@ -1,12 +1,13 @@
 import { useId, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, FileQuestion } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Download, FileQuestion } from 'lucide-react'
 import { useChecklist } from '../hooks/useChecklist'
 import { useReviewChecklist } from '../hooks/useReviewChecklist'
 import { useSession } from '../context/SessionContext'
 import { ChecklistDetailView } from '../components/checklist/ChecklistDetailView'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { getButtonClasses } from '../components/ui/buttonStyles'
 import { Field, inputClasses } from '../components/ui/Field'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
@@ -54,10 +55,23 @@ export default function RecordDetailPage() {
 
   return (
     <div>
-      <Link to="/records" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-text">
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        Back to records
-      </Link>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <Link to="/records" className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-text">
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Back to records
+        </Link>
+        {!loading && !error && !notFound && record && (
+          <a
+            href={`/api/records/${record.id}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={getButtonClasses('secondary', 'md')}
+          >
+            <Download className="size-4" aria-hidden="true" />
+            Download PDF
+          </a>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex flex-col gap-4">
