@@ -12,7 +12,7 @@ datasource db {
 // Prisma never writes to this table; connect-pg-simple owns it exclusively.
 model Session {
   sid    String   @id @db.VarChar
-  sess   Json     @db.Json
+  sess   Json
   expire DateTime @db.Timestamp(6)
 
   @@index([expire], map: "IDX_session_expire")
@@ -47,6 +47,7 @@ model User {
   passwordHash String
   role         UserRole
   department   String
+  signatureDataUrl String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

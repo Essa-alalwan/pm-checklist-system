@@ -9,7 +9,7 @@ function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function createEmptyLvAcMotorDraft(templateItems: ChecklistTemplateItemDef[], doneBy = ''): LvAcMotorDraft {
+export function createEmptyLvAcMotorDraft(templateItems: ChecklistTemplateItemDef[], doneBy = '', signatureDataUrl = ''): LvAcMotorDraft {
   return {
     type: 'lv-ac-motor',
     kksCode: '',
@@ -19,7 +19,7 @@ export function createEmptyLvAcMotorDraft(templateItems: ChecklistTemplateItemDe
     doneBy,
     numberOfHelpers: 0,
     reviewedBy: undefined,
-    signatureDataUrl: '',
+    signatureDataUrl,
     remarks: '',
     items: templateItems.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
     windingResistance: [
@@ -35,7 +35,7 @@ export function createEmptyLvAcMotorDraft(templateItems: ChecklistTemplateItemDe
   }
 }
 
-export function createEmptyGeneratorDraft(templateItems: ChecklistTemplateItemDef[], doneBy = ''): GeneratorDraft {
+export function createEmptyGeneratorDraft(templateItems: ChecklistTemplateItemDef[], doneBy = '', signatureDataUrl = ''): GeneratorDraft {
   return {
     type: 'generator',
     kksCode: '',
@@ -45,7 +45,7 @@ export function createEmptyGeneratorDraft(templateItems: ChecklistTemplateItemDe
     doneBy,
     numberOfHelpers: 0,
     reviewedBy: undefined,
-    signatureDataUrl: '',
+    signatureDataUrl,
     remarks: '',
     items: templateItems.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
     shaftGroundingBrushes: [1, 2, 3, 4].map((holderNumber) => ({ holderNumber, lengthMm: undefined })),
@@ -58,7 +58,12 @@ export function createEmptyGeneratorDraft(templateItems: ChecklistTemplateItemDe
   }
 }
 
-export function createEmptyGenericDraft(type: ChecklistType, templateItems: ChecklistTemplateItemDef[], doneBy = ''): GenericDraft {
+export function createEmptyGenericDraft(
+  type: ChecklistType,
+  templateItems: ChecklistTemplateItemDef[],
+  doneBy = '',
+  signatureDataUrl = '',
+): GenericDraft {
   return {
     type,
     kksCode: '',
@@ -68,7 +73,7 @@ export function createEmptyGenericDraft(type: ChecklistType, templateItems: Chec
     doneBy,
     numberOfHelpers: 0,
     reviewedBy: undefined,
-    signatureDataUrl: '',
+    signatureDataUrl,
     remarks: '',
     items: templateItems.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
   }

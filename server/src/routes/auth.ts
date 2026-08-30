@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../db'
+import { requireAuth } from '../middleware/requireAuth'
 
 export const authRouter = Router()
 
@@ -10,8 +11,22 @@ const loginSchema = z.object({
   password: z.string().min(1),
 })
 
-function toPublicUser(user: { id: string; name: string; username: string; role: string; department: string }) {
-  return { id: user.id, name: user.name, username: user.username, role: user.role, department: user.department }
+function toPublicUser(user: {
+  id: string
+  name: string
+  username: string
+  role: string
+  department: string
+  signatureDataUrl: string | null
+}) {
+  return {
+    id: user.id,
+    name: user.name,
+    username: user.username,
+    role: user.role,
+    department: user.department,
+    signatureDataUrl: user.signatureDataUrl ?? undefined,
+  }
 }
 
 authRouter.post('/login', async (req, res) => {
@@ -46,4 +61,23 @@ authRouter.get('/me', (req, res) => {
     return
   }
   res.json({ user: toPublicUser(req.user) })
+})
+
+const updateSignatureSchema = z.object({
+  signatureDataUrl: z.string().min(1).startsWith('data:image/'),
+})
+
+authRouter.patch('/me/signature', requireAuth, async (req, res) => {
+  const parsed = updateSignatureSchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'A valid signature image is required.' })
+    return
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { signatureDataUrl: parsed.data.signatureDataUrl },
+  })
+
+  res.json({ user: toPublicUser(updated) })
 })

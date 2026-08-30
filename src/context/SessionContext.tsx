@@ -9,6 +9,7 @@ export interface Session {
   name: string
   role: UserRole
   department: string
+  signatureDataUrl?: string
 }
 
 const INITIAL_SESSION: Session = {
@@ -17,6 +18,7 @@ const INITIAL_SESSION: Session = {
   name: '',
   role: 'technician',
   department: '',
+  signatureDataUrl: undefined,
 }
 
 interface ApiUser {
@@ -25,17 +27,19 @@ interface ApiUser {
   username: string
   role: UserRole
   department: string
+  signatureDataUrl?: string
 }
 
 interface SessionContextValue extends Session {
   login: (details: { username: string; password: string }) => Promise<void>
   logout: () => Promise<void>
+  updateSignature: (signatureDataUrl: string) => Promise<void>
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined)
 
 function toSession(user: ApiUser): Session {
-  return { isAuthenticated: true, loading: false, name: user.name, role: user.role, department: user.department }
+  return { isAuthenticated: true, loading: false, name: user.name, role: user.role, department: user.department, signatureDataUrl: user.signatureDataUrl }
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -68,6 +72,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       logout: async () => {
         await apiFetch('/auth/logout', { method: 'POST' })
         setSession({ ...INITIAL_SESSION, loading: false })
+      },
+      updateSignature: async (signatureDataUrl: string) => {
+        const { user } = await apiFetch<{ user: ApiUser }>('/auth/me/signature', {
+          method: 'PATCH',
+          body: JSON.stringify({ signatureDataUrl }),
+        })
+        setSession(toSession(user))
       },
     }),
     [session],

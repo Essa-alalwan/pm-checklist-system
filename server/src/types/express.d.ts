@@ -15,6 +15,7 @@ declare global {
         username: string
         role: UserRole
         department: string
+        signatureDataUrl: string | null
       }
     }
   }

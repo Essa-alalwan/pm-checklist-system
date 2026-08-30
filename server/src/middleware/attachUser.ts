@@ -10,7 +10,14 @@ export async function attachUser(req: Request, _res: Response, next: NextFunctio
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (user) {
-    req.user = { id: user.id, name: user.name, username: user.username, role: user.role, department: user.department }
+    req.user = {
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      role: user.role,
+      department: user.department,
+      signatureDataUrl: user.signatureDataUrl,
+    }
   } else {
     // Session points at a user that no longer exists — clear it.
     req.session.userId = undefined

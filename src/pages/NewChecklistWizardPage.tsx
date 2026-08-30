@@ -47,7 +47,7 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
   const hasMeasurements = (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(type)
   const steps = useMemo(() => buildSteps(hasMeasurements), [hasMeasurements])
   const navigate = useNavigate()
-  const { name } = useSession()
+  const { name, signatureDataUrl: savedSignature } = useSession()
   const { submit, submitting, error: submitError } = useCreateChecklist()
 
   const initial = useMemo<WizardState>(
@@ -55,10 +55,10 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
       step: 0,
       data:
         type === 'lv-ac-motor'
-          ? createEmptyLvAcMotorDraft(template.items, name)
+          ? createEmptyLvAcMotorDraft(template.items, name, savedSignature)
           : type === 'generator'
-            ? createEmptyGeneratorDraft(template.items, name)
-            : createEmptyGenericDraft(type, template.items, name),
+            ? createEmptyGeneratorDraft(template.items, name, savedSignature)
+            : createEmptyGenericDraft(type, template.items, name, savedSignature),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [type],
