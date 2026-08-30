@@ -1,8 +1,9 @@
-import type { ChecklistTemplateItemDef, GeneratorChecklist, LvAcMotorChecklist } from '../../types/checklist'
+import type { ChecklistTemplateItemDef, GeneratorChecklist, GenericChecklist, LvAcMotorChecklist, ChecklistType } from '../../types/checklist'
 
 export type LvAcMotorDraft = Omit<LvAcMotorChecklist, 'id' | 'createdAt' | 'status'>
 export type GeneratorDraft = Omit<GeneratorChecklist, 'id' | 'createdAt' | 'status'>
-export type ChecklistDraft = LvAcMotorDraft | GeneratorDraft
+export type GenericDraft = Omit<GenericChecklist, 'id' | 'createdAt' | 'status'>
+export type ChecklistDraft = LvAcMotorDraft | GeneratorDraft | GenericDraft
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -54,5 +55,21 @@ export function createEmptyGeneratorDraft(templateItems: ChecklistTemplateItemDe
     ipbTempC: undefined,
     ipbHumidityPercent: undefined,
     gtRunningHours: undefined,
+  }
+}
+
+export function createEmptyGenericDraft(type: ChecklistType, templateItems: ChecklistTemplateItemDef[], doneBy = ''): GenericDraft {
+  return {
+    type,
+    kksCode: '',
+    equipmentDescription: '',
+    date: today(),
+    preparedBy: '',
+    doneBy,
+    numberOfHelpers: 0,
+    reviewedBy: undefined,
+    signatureDataUrl: '',
+    remarks: '',
+    items: templateItems.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
   }
 }

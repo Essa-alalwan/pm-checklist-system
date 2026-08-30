@@ -11,6 +11,7 @@ import NotFoundPage from './pages/NotFoundPage'
 import RecordDetailPage from './pages/RecordDetailPage'
 import RecordsPage from './pages/RecordsPage'
 import SettingsPage from './pages/SettingsPage'
+import UploadChecklistTypePage from './pages/UploadChecklistTypePage'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
             <Route element={<AppShell />}>
               <Route index element={<DashboardPage />} />
               <Route path="checklists/new" element={<NewChecklistTypePage />} />
+              <Route path="checklists/new/upload" element={<UploadChecklistTypePage />} />
               <Route path="checklists/new/:type" element={<NewChecklistWizardPage />} />
               <Route path="records" element={<RecordsPage />} />
               <Route path="records/:id" element={<RecordDetailPage />} />

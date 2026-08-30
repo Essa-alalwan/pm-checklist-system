@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Send } from 'lucide-react'
 import type { ChecklistTemplate, ChecklistType } from '../types/checklist'
+import { BUILT_IN_CHECKLIST_TYPES } from '../types/checklist'
 import { useTemplates } from '../context/TemplatesContext'
 import {
+  createEmptyGenericDraft,
   createEmptyGeneratorDraft,
   createEmptyLvAcMotorDraft,
   type ChecklistDraft,
@@ -23,13 +25,17 @@ import { StepMeasurementsGenerator } from '../components/checklist/wizard/StepMe
 import { StepRemarksSignature } from '../components/checklist/wizard/StepRemarksSignature'
 import { StepReview } from '../components/checklist/wizard/StepReview'
 
-const STEPS = [
-  { id: 'job-info', label: 'Job Info' },
-  { id: 'items', label: 'Checklist' },
-  { id: 'measurements', label: 'Measurements' },
-  { id: 'signoff', label: 'Sign-off' },
-  { id: 'review', label: 'Review' },
-]
+type StepId = 'job-info' | 'items' | 'measurements' | 'signoff' | 'review'
+
+function buildSteps(hasMeasurements: boolean): { id: StepId; label: string }[] {
+  const steps: { id: StepId; label: string }[] = [
+    { id: 'job-info', label: 'Job Info' },
+    { id: 'items', label: 'Checklist' },
+  ]
+  if (hasMeasurements) steps.push({ id: 'measurements', label: 'Measurements' })
+  steps.push({ id: 'signoff', label: 'Sign-off' }, { id: 'review', label: 'Review' })
+  return steps
+}
 
 interface WizardState {
   step: number
@@ -38,6 +44,8 @@ interface WizardState {
 
 function WizardInner({ template }: { template: ChecklistTemplate }) {
   const type = template.type
+  const hasMeasurements = (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(type)
+  const steps = useMemo(() => buildSteps(hasMeasurements), [hasMeasurements])
   const navigate = useNavigate()
   const { name } = useSession()
   const { submit, submitting, error: submitError } = useCreateChecklist()
@@ -45,7 +53,12 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
   const initial = useMemo<WizardState>(
     () => ({
       step: 0,
-      data: type === 'lv-ac-motor' ? createEmptyLvAcMotorDraft(template.items, name) : createEmptyGeneratorDraft(template.items, name),
+      data:
+        type === 'lv-ac-motor'
+          ? createEmptyLvAcMotorDraft(template.items, name)
+          : type === 'generator'
+            ? createEmptyGeneratorDraft(template.items, name)
+            : createEmptyGenericDraft(type, template.items, name),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [type],
@@ -56,6 +69,7 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
   const [blockingMessage, setBlockingMessage] = useState<string | null>(null)
 
   const { step, data } = state
+  const currentStepId = steps[step].id
 
   const patchData = (patch: Partial<ChecklistDraft>) => {
     setState({ step, data: { ...data, ...patch } as ChecklistDraft })
@@ -72,22 +86,22 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
   }
 
   const handleNext = () => {
-    if (step === 0 && Object.keys(jobInfoErrors).length > 0) {
+    if (currentStepId === 'job-info' && Object.keys(jobInfoErrors).length > 0) {
       setShowErrors(true)
       return
     }
-    if (step === 1 && itemsError) {
+    if (currentStepId === 'items' && itemsError) {
       setBlockingMessage(itemsError.message)
       document.getElementById(`checklist-item-${itemsError.itemId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
-    if (step === 3 && signatureError) {
+    if (currentStepId === 'signoff' && signatureError) {
       setBlockingMessage(signatureError)
       return
     }
     setBlockingMessage(null)
     setShowErrors(false)
-    setState({ step: Math.min(step + 1, STEPS.length - 1), data })
+    setState({ step: Math.min(step + 1, steps.length - 1), data })
   }
 
   const handleBack = () => {
@@ -113,7 +127,7 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
     <WizardShell
       title={template.label}
       subtitle={template.description}
-      steps={STEPS}
+      steps={steps}
       currentStepIndex={step}
       saveState={saveState}
       onStepClick={goToStep}
@@ -134,7 +148,7 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
               <ArrowLeft className="size-4" aria-hidden="true" />
               Back
             </Button>
-            {step < STEPS.length - 1 ? (
+            {step < steps.length - 1 ? (
               <Button onClick={handleNext}>
                 Next
                 <ArrowRight className="size-4" aria-hidden="true" />
@@ -149,16 +163,18 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
         </div>
       }
     >
-      {step === 0 && <StepJobInfo draft={data} errors={showErrors ? jobInfoErrors : {}} onChange={patchData} />}
-      {step === 1 && <StepChecklistItems items={data.items} onChange={(items) => patchData({ items })} />}
-      {step === 2 &&
+      {currentStepId === 'job-info' && <StepJobInfo draft={data} errors={showErrors ? jobInfoErrors : {}} onChange={patchData} />}
+      {currentStepId === 'items' && <StepChecklistItems items={data.items} onChange={(items) => patchData({ items })} />}
+      {currentStepId === 'measurements' &&
         (data.type === 'lv-ac-motor' ? (
           <StepMeasurementsLvAcMotor draft={data as LvAcMotorDraft} onChange={(patch) => patchData(patch)} />
         ) : (
           <StepMeasurementsGenerator draft={data as GeneratorDraft} onChange={(patch) => patchData(patch)} />
         ))}
-      {step === 3 && <StepRemarksSignature draft={data} signatureError={blockingMessage ? signatureError : null} onChange={patchData} />}
-      {step === 4 && <StepReview draft={data} />}
+      {currentStepId === 'signoff' && (
+        <StepRemarksSignature draft={data} signatureError={blockingMessage ? signatureError : null} onChange={patchData} />
+      )}
+      {currentStepId === 'review' && <StepReview draft={data} />}
     </WizardShell>
   )
 }

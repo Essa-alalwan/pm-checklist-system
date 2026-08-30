@@ -1,0 +1,247 @@
+import { useId, useRef, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { ArrowLeft, FileUp, Plus, Trash2, Upload } from 'lucide-react'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Card, CardBody, CardHeader } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
+import { Field, inputClasses } from '../components/ui/Field'
+import { useTemplates } from '../context/TemplatesContext'
+import { useSession } from '../context/SessionContext'
+import { parseChecklistDocx, createChecklistTemplate } from '../data/templatesApi'
+import { ApiError } from '../data/apiClient'
+
+interface ReviewState {
+  label: string
+  description: string
+  items: string[]
+}
+
+export default function UploadChecklistTypePage() {
+  const navigate = useNavigate()
+  const { role } = useSession()
+  const { refetch } = useTemplates()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const labelId = useId()
+  const descriptionId = useId()
+
+  const [parsing, setParsing] = useState(false)
+  const [parseError, setParseError] = useState<string | null>(null)
+  const [review, setReview] = useState<ReviewState | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setParsing(true)
+    setParseError(null)
+    try {
+      const parsed = await parseChecklistDocx(file)
+      setReview({ label: parsed.suggestedLabel, description: parsed.suggestedDescription, items: parsed.items })
+    } catch (err) {
+      setParseError(err instanceof ApiError ? err.message : 'Could not read this document. Please try again.')
+    } finally {
+      setParsing(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const updateItem = (index: number, text: string) => {
+    if (!review) return
+    const items = [...review.items]
+    items[index] = text
+    setReview({ ...review, items })
+  }
+
+  const removeItem = (index: number) => {
+    if (!review) return
+    setReview({ ...review, items: review.items.filter((_, i) => i !== index) })
+  }
+
+  const moveItem = (index: number, direction: -1 | 1) => {
+    if (!review) return
+    const target = index + direction
+    if (target < 0 || target >= review.items.length) return
+    const items = [...review.items]
+    ;[items[index], items[target]] = [items[target], items[index]]
+    setReview({ ...review, items })
+  }
+
+  const addItem = () => {
+    if (!review) return
+    setReview({ ...review, items: [...review.items, ''] })
+  }
+
+  const handleSubmit = async () => {
+    if (!review) return
+    const items = review.items.map((i) => i.trim()).filter(Boolean)
+    if (!review.label.trim() || items.length === 0) {
+      setSubmitError('A title and at least one checklist item are required.')
+      return
+    }
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await createChecklistTemplate({ label: review.label.trim(), description: review.description.trim(), items })
+      refetch()
+      navigate('/checklists/new')
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : 'Could not create this checklist type. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (role !== 'supervisor') {
+    return <Navigate to="/checklists/new" replace />
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => navigate('/checklists/new')}
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-text"
+      >
+        <ArrowLeft className="size-4" aria-hidden="true" />
+        Back to checklist types
+      </button>
+
+      <PageHeader
+        title="Upload New Checklist Type"
+        description="Upload the department's existing Word-doc checklist. Review the detected items before it becomes a real checklist type."
+      />
+
+      {!review ? (
+        <Card>
+          <CardBody className="flex flex-col items-center gap-4 py-12 text-center">
+            <div className="flex size-14 items-center justify-center rounded-full border border-border-strong bg-surface-2 text-brand-strong">
+              <FileUp className="size-6" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-text">Upload a .docx checklist document</p>
+              <p className="mt-1 max-w-sm text-sm text-text-muted">
+                Numbered inspection items will be detected automatically. You'll be able to review and edit everything before it's saved.
+              </p>
+            </div>
+            <input ref={fileInputRef} type="file" accept=".docx" onChange={handleFileChange} className="hidden" aria-label="Upload .docx checklist" />
+            <Button type="button" loading={parsing} onClick={() => fileInputRef.current?.click()}>
+              <Upload className="size-4" aria-hidden="true" />
+              Choose File
+            </Button>
+            {parseError && (
+              <p role="alert" className="text-sm font-medium text-critical">
+                {parseError}
+              </p>
+            )}
+          </CardBody>
+        </Card>
+      ) : (
+        <div className="flex flex-col gap-5">
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-semibold text-text">Checklist Details</h2>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4">
+              <Field label="Title" htmlFor={labelId} required>
+                <input
+                  id={labelId}
+                  className={inputClasses}
+                  value={review.label}
+                  onChange={(e) => setReview({ ...review, label: e.target.value })}
+                />
+              </Field>
+              <Field label="Description" htmlFor={descriptionId} hint="Optional — shown on the checklist type picker.">
+                <textarea
+                  id={descriptionId}
+                  rows={2}
+                  className={`${inputClasses} min-h-16 resize-y py-2`}
+                  value={review.description}
+                  onChange={(e) => setReview({ ...review, description: e.target.value })}
+                />
+              </Field>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-text">Checklist Items</h2>
+              <span className="text-xs text-text-faint">
+                {review.items.length} item{review.items.length === 1 ? '' : 's'}
+              </span>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-2">
+              {review.items.length === 0 && (
+                <p className="py-2 text-sm text-text-muted">No items detected — add them manually below.</p>
+              )}
+              {review.items.map((item, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-3 font-mono text-xs font-semibold text-text-faint">
+                    {index + 1}
+                  </span>
+                  <input
+                    className={`${inputClasses} flex-1`}
+                    value={item}
+                    onChange={(e) => updateItem(index, e.target.value)}
+                    placeholder="Checklist item text"
+                  />
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => moveItem(index, -1)}
+                      disabled={index === 0}
+                      className="flex size-9 items-center justify-center rounded-lg text-text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
+                      aria-label="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveItem(index, 1)}
+                      disabled={index === review.items.length - 1}
+                      className="flex size-9 items-center justify-center rounded-lg text-text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
+                      aria-label="Move down"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="flex size-9 items-center justify-center rounded-lg text-text-faint hover:bg-critical/10 hover:text-critical"
+                      aria-label="Remove item"
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addItem}
+                className="mt-2 flex min-h-10 items-center gap-1.5 self-start rounded-lg border border-dashed border-border-strong px-3 text-sm font-medium text-text-muted hover:border-brand hover:text-brand-strong"
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                Add item
+              </button>
+            </CardBody>
+          </Card>
+
+          {submitError && (
+            <p role="alert" className="text-sm font-medium text-critical">
+              {submitError}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={() => setReview(null)}>
+              Start over
+            </Button>
+            <Button onClick={handleSubmit} loading={submitting}>
+              Create Checklist Type
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

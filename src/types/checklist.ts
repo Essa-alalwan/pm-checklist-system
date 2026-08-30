@@ -7,7 +7,11 @@ export interface ChecklistItemResult {
   note?: string
 }
 
-export type ChecklistType = 'lv-ac-motor' | 'generator'
+// The two built-in types have bespoke measurement UI; any other value is a
+// supervisor-uploaded checklist type with items only (no measurements).
+export const BUILT_IN_CHECKLIST_TYPES = ['lv-ac-motor', 'generator'] as const
+export type BuiltInChecklistType = (typeof BUILT_IN_CHECKLIST_TYPES)[number]
+export type ChecklistType = string
 
 export type ChecklistRecordStatus = 'submitted' | 'reviewed'
 
@@ -68,7 +72,13 @@ export interface GeneratorChecklist extends ChecklistBase {
   gtRunningHours?: number
 }
 
-export type ChecklistRecord = LvAcMotorChecklist | GeneratorChecklist
+// A supervisor-uploaded checklist type: base sign-off fields + items, nothing
+// type-specific. `type` is guaranteed to NOT be one of BUILT_IN_CHECKLIST_TYPES.
+export interface GenericChecklist extends ChecklistBase {
+  type: string
+}
+
+export type ChecklistRecord = LvAcMotorChecklist | GeneratorChecklist | GenericChecklist
 
 // What the client sends to create a record — the server assigns id/createdAt/status.
 export type ChecklistCreateInput = Omit<ChecklistRecord, 'id' | 'createdAt' | 'status'>

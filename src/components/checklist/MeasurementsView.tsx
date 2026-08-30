@@ -10,6 +10,8 @@ type GenSource = { type: 'generator' } & Pick<
   'shaftGroundingBrushes' | 'brushLengths' | 'h2PressureBar' | 'ipbPressureBar' | 'ipbTempC' | 'ipbHumidityPercent' | 'gtRunningHours'
 >
 
+type GenericSource = { type: string }
+
 function ReadingTile({ label, value, unit }: { label: string; value: number | undefined; unit: string }) {
   return (
     <div className="rounded-lg border border-border bg-surface-2 px-3 py-2.5">
@@ -114,7 +116,8 @@ function GeneratorMeasurements({ source }: { source: GenSource }) {
   )
 }
 
-export function MeasurementsView({ source }: { source: LvSource | GenSource }) {
-  if (source.type === 'lv-ac-motor') return <LvAcMotorMeasurements source={source} />
-  return <GeneratorMeasurements source={source} />
+export function MeasurementsView({ source }: { source: LvSource | GenSource | GenericSource }) {
+  if (source.type === 'lv-ac-motor') return <LvAcMotorMeasurements source={source as LvSource} />
+  if (source.type === 'generator') return <GeneratorMeasurements source={source as GenSource} />
+  return null
 }

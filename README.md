@@ -45,6 +45,10 @@ Open the URL Vite prints (typically http://localhost:5173) and sign in with one 
 
 **Resetting the database:** `docker compose down -v` removes the Postgres volume; run the migrate/seed steps again to start fresh. `npx prisma studio` (from `server/`) opens a GUI to browse/edit the data directly.
 
+## Adding a checklist type by uploading a Word doc
+
+A supervisor can add a new checklist type without any code changes: **New Checklist → Upload New Checklist Type**, upload a `.docx`. The parser (`server/src/parsing/parseChecklistDocx.ts`) looks for numbered lines (`"1. Clean the low voltage motor.  (    )"`) and treats each as a checklist item, stripping the trailing fill-in-the-blank placeholder and ignoring tables/blank-fill lines/footer text. The result is always shown on a review screen — titles/items can be edited, reordered, added, or removed — before anything is saved. Uploaded types get the same Job Info → Checklist Items → Sign-off → Review wizard as the built-in types, just without a Measurements step (only LV AC Motor and Generator have hand-built measurement screens today).
+
 ## Project structure
 
 **Frontend (`src/`)**
@@ -64,6 +68,7 @@ Open the URL Vite prints (typically http://localhost:5173) and sign in with one 
 - `prisma/seed.ts` — creates the two checklist templates, two demo accounts, and a handful of sample records.
 - `src/routes/` — the Express route handlers (`auth`, `templates`, `records`, `dashboard`).
 - `src/mappers/` — converts between the flat DB rows and the exact JSON shapes the frontend expects (`readings.ts` handles the numeric-measurement flattening/unflattening per checklist type).
+- `src/parsing/parseChecklistDocx.ts` — extracts checklist items from an uploaded `.docx` (used by `POST /api/templates/parse-docx`).
 - `src/pdf/generateRecordPdf.ts` — builds the PDF served from `GET /api/records/:id/pdf`.
 - `src/middleware/` — session-based auth (`attachUser`, `requireAuth`, `requireRole`).
 
@@ -71,4 +76,4 @@ Open the URL Vite prints (typically http://localhost:5173) and sign in with one 
 
 **Frontend:** Vite + React + TypeScript, React Router, Tailwind CSS (custom design tokens for the dark instrumentation theme), lucide-react icons.
 
-**Backend:** Express + TypeScript, Prisma (PostgreSQL), express-session + connect-pg-simple (cookie sessions stored in Postgres), bcryptjs, Zod, PDFKit.
+**Backend:** Express + TypeScript, Prisma (PostgreSQL), express-session + connect-pg-simple (cookie sessions stored in Postgres), bcryptjs, Zod, PDFKit, mammoth (docx text extraction), multer (file uploads).

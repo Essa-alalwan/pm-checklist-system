@@ -1,5 +1,6 @@
-import { CircleGauge, Zap } from 'lucide-react'
+import { CircleGauge, ClipboardList, Zap } from 'lucide-react'
 import type { ChecklistRecord } from '../../types/checklist'
+import { BUILT_IN_CHECKLIST_TYPES } from '../../types/checklist'
 import type { ChecklistDraft } from '../../features/wizard/draftFactory'
 import { useTemplates } from '../../context/TemplatesContext'
 import { Card, CardBody, CardHeader } from '../ui/Card'
@@ -22,7 +23,8 @@ function formatDateTime(iso: string) {
 export function ChecklistDetailView({ record }: { record: DetailSource }) {
   const { getTemplate } = useTemplates()
   const template = getTemplate(record.type)
-  const Icon = record.type === 'generator' ? Zap : CircleGauge
+  const hasMeasurements = (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(record.type)
+  const Icon = record.type === 'generator' ? Zap : record.type === 'lv-ac-motor' ? CircleGauge : ClipboardList
   const status = 'status' in record ? record.status : undefined
   const flagged = record.items.some((i) => i.status === 'flagged')
 
@@ -89,14 +91,16 @@ export function ChecklistDetailView({ record }: { record: DetailSource }) {
         </CardBody>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-sm font-semibold text-text">Measurements</h2>
-        </CardHeader>
-        <CardBody>
-          <MeasurementsView source={record} />
-        </CardBody>
-      </Card>
+      {hasMeasurements && (
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-text">Measurements</h2>
+          </CardHeader>
+          <CardBody>
+            <MeasurementsView source={record} />
+          </CardBody>
+        </Card>
+      )}
 
       {record.remarks && (
         <Card>

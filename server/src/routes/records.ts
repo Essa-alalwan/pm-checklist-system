@@ -57,7 +57,18 @@ const generatorSchema = baseSchema.extend({
   gtRunningHours: z.number().optional(),
 })
 
-const createRecordSchema = z.discriminatedUnion('type', [lvAcMotorSchema, generatorSchema])
+// Supervisor-uploaded checklist types have no type-specific fields — just the
+// base sign-off info and items. `type` isn't a literal here (it's whatever
+// slug the template was given), so this can't join the two schemas above in
+// a z.discriminatedUnion — dispatch on `type` manually instead.
+const genericSchema = baseSchema.extend({ type: z.string().min(1) })
+
+function parseCreateRecordBody(body: unknown) {
+  const type = (body as { type?: unknown } | null)?.type
+  if (type === 'lv-ac-motor') return lvAcMotorSchema.safeParse(body)
+  if (type === 'generator') return generatorSchema.safeParse(body)
+  return genericSchema.safeParse(body)
+}
 
 const reviewSchema = z.object({ reviewedBy: z.string().min(1) })
 
@@ -85,7 +96,7 @@ recordsRouter.get('/:id', async (req, res) => {
 })
 
 recordsRouter.post('/', requireAuth, async (req, res) => {
-  const parsed = createRecordSchema.safeParse(req.body)
+  const parsed = parseCreateRecordBody(req.body)
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid checklist payload.', details: parsed.error.flatten() })
     return

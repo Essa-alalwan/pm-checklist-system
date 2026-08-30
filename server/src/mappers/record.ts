@@ -43,11 +43,22 @@ export function toApiRecord(db: DbRecordWithRelations): ChecklistRecord {
   if (type === 'lv-ac-motor') {
     return { ...base, type, ...parseLvAcMotorReadings(db.readings) }
   }
-  return { ...base, type, ...parseGeneratorReadings(db.readings, db.id) }
+  if (type === 'generator') {
+    return { ...base, type, ...parseGeneratorReadings(db.readings, db.id) }
+  }
+  return { ...base, type }
 }
 
-export type MeasurementsInput = ({ type: 'lv-ac-motor' } & LvAcMotorMeasurements) | ({ type: 'generator' } & GeneratorMeasurements)
+export type MeasurementsInput =
+  | ({ type: 'lv-ac-motor' } & LvAcMotorMeasurements)
+  | ({ type: 'generator' } & GeneratorMeasurements)
+  | { type: string }
 
 export function buildReadingsForRecord(input: MeasurementsInput) {
-  return input.type === 'lv-ac-motor' ? buildLvAcMotorReadings(input) : buildGeneratorReadings(input)
+  // `input.type` is a plain `string` on the generic union member, so TS can't
+  // prove it excludes the literal types below purely from the equality check —
+  // the cast is safe because the shape genuinely matches at runtime for these branches.
+  if (input.type === 'lv-ac-motor') return buildLvAcMotorReadings(input as LvAcMotorMeasurements)
+  if (input.type === 'generator') return buildGeneratorReadings(input as GeneratorMeasurements)
+  return []
 }

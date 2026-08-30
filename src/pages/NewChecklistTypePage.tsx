@@ -1,16 +1,18 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, CircleGauge, ClipboardList, Zap } from 'lucide-react'
+import { ArrowRight, CircleGauge, ClipboardList, FileUp, Zap } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardBody } from '../components/ui/Card'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import { ErrorState } from '../components/ui/ErrorState'
 import { useTemplates } from '../context/TemplatesContext'
+import { useSession } from '../context/SessionContext'
 import type { ChecklistType } from '../types/checklist'
 
 const ICONS: Partial<Record<ChecklistType, typeof CircleGauge>> = { 'lv-ac-motor': CircleGauge, generator: Zap }
 
 export default function NewChecklistTypePage() {
   const { templates, loading, error, refetch } = useTemplates()
+  const { role } = useSession()
 
   return (
     <div>
@@ -50,6 +52,28 @@ export default function NewChecklistTypePage() {
               </Link>
             )
           })}
+
+          {role === 'supervisor' && (
+            <Link to="/checklists/new/upload" className="group block">
+              <Card className="h-full border-dashed transition-colors group-hover:border-brand/50 group-hover:bg-surface-2 group-focus-visible:border-brand">
+                <CardBody className="flex h-full flex-col gap-4">
+                  <div className="flex size-12 items-center justify-center rounded-lg border border-border-strong bg-surface-2 text-text-muted">
+                    <FileUp className="size-6" aria-hidden="true" />
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-base font-semibold text-text">Upload New Checklist Type</h2>
+                    <p className="mt-1 text-sm text-text-muted">Upload a Word-doc checklist and turn it into a new checklist type for the department.</p>
+                  </div>
+                  <div className="flex items-center justify-end text-sm">
+                    <span className="flex items-center gap-1 font-medium text-brand-strong">
+                      Upload
+                      <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                    </span>
+                  </div>
+                </CardBody>
+              </Card>
+            </Link>
+          )}
         </div>
       )}
     </div>
