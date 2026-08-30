@@ -1,21 +1,5 @@
-import type { ChecklistRecord, ChecklistType } from '../types/checklist'
-import { checklistSeed } from './seed/checklists.seed'
-import { readJson, writeJson } from './storage'
-
-const STORE_KEY = 'checklists'
-const SIMULATED_LATENCY_MS = 350
-
-function delay<T>(value: T): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), SIMULATED_LATENCY_MS))
-}
-
-function loadAll(): ChecklistRecord[] {
-  return readJson<ChecklistRecord[]>(STORE_KEY, checklistSeed)
-}
-
-function saveAll(records: ChecklistRecord[]): void {
-  writeJson(STORE_KEY, records)
-}
+import type { ChecklistCreateInput, ChecklistRecord, ChecklistType } from '../types/checklist'
+import { apiFetch, buildQueryString } from './apiClient'
 
 export function hasFlaggedItems(record: ChecklistRecord): boolean {
   return record.items.some((item) => item.status === 'flagged')
@@ -31,51 +15,39 @@ export interface ChecklistFilters {
 }
 
 /**
- * This module is the seam that Phase 2 replaces: every function below keeps its
- * signature and return shape, but the implementation swaps from localStorage
- * reads/writes to real `fetch` calls against the backend API.
+ * This module is the seam Phase 2 replaced: every function below keeps the
+ * exact signature and return shape it had in Phase 1 (when it read/wrote
+ * localStorage) — only the implementation changed, to real API calls. Pages
+ * and hooks built against this module needed no changes.
  */
 
 export async function listChecklists(filters: ChecklistFilters = {}): Promise<ChecklistRecord[]> {
-  const all = loadAll()
-  const filtered = all.filter((record) => {
-    if (filters.type && filters.type !== 'all' && record.type !== filters.type) return false
-    if (filters.kksCode && !record.kksCode.toLowerCase().includes(filters.kksCode.toLowerCase())) return false
-    if (filters.technician && !record.doneBy.toLowerCase().includes(filters.technician.toLowerCase())) return false
-    if (filters.dateFrom && record.date < filters.dateFrom) return false
-    if (filters.dateTo && record.date > filters.dateTo) return false
-    if (filters.onlyFlagged && !hasFlaggedItems(record)) return false
-    return true
+  const qs = buildQueryString({
+    type: filters.type,
+    kksCode: filters.kksCode,
+    technician: filters.technician,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+    onlyFlagged: filters.onlyFlagged ? 'true' : undefined,
   })
-  filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  return delay(filtered)
+  return apiFetch<ChecklistRecord[]>(`/records${qs}`)
 }
 
 export async function getChecklist(id: string): Promise<ChecklistRecord | undefined> {
-  const all = loadAll()
-  return delay(all.find((r) => r.id === id))
+  try {
+    return await apiFetch<ChecklistRecord>(`/records/${id}`)
+  } catch (err) {
+    if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) return undefined
+    throw err
+  }
 }
 
-export async function createChecklist(record: ChecklistRecord): Promise<ChecklistRecord> {
-  const all = loadAll()
-  const next = [record, ...all]
-  saveAll(next)
-  return delay(record)
+export async function createChecklist(input: ChecklistCreateInput): Promise<ChecklistRecord> {
+  return apiFetch<ChecklistRecord>('/records', { method: 'POST', body: JSON.stringify(input) })
 }
 
 export async function reviewChecklist(id: string, reviewedBy: string): Promise<ChecklistRecord> {
-  const all = loadAll()
-  const idx = all.findIndex((r) => r.id === id)
-  if (idx === -1) throw new Error(`Checklist ${id} not found`)
-  const updated: ChecklistRecord = {
-    ...all[idx],
-    reviewedBy,
-    reviewedAt: new Date().toISOString(),
-    status: 'reviewed',
-  }
-  all[idx] = updated
-  saveAll(all)
-  return delay(updated)
+  return apiFetch<ChecklistRecord>(`/records/${id}/review`, { method: 'PATCH', body: JSON.stringify({ reviewedBy }) })
 }
 
 export interface DashboardStats {
@@ -86,25 +58,9 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const all = loadAll()
-  const now = new Date('2026-08-26T23:59:59')
-  const weekAgo = new Date(now)
-  weekAgo.setDate(weekAgo.getDate() - 7)
-
-  const recordsThisWeek = all.filter((r) => new Date(r.createdAt) >= weekAgo).length
-  const flaggedAwaitingReview = all.filter((r) => hasFlaggedItems(r) && r.status !== 'reviewed').length
-  const pendingReview = all.filter((r) => r.status !== 'reviewed').length
-
-  return delay({
-    recordsThisWeek,
-    flaggedAwaitingReview,
-    totalRecords: all.length,
-    pendingReview,
-  })
+  return apiFetch<DashboardStats>('/dashboard/stats')
 }
 
 export async function getRecentActivity(limit = 6): Promise<ChecklistRecord[]> {
-  const all = loadAll()
-  const sorted = [...all].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  return delay(sorted.slice(0, limit))
+  return apiFetch<ChecklistRecord[]>(`/dashboard/recent${buildQueryString({ limit: String(limit) })}`)
 }

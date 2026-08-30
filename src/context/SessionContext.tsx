@@ -1,48 +1,74 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
-import { readJson, writeJson } from '../data/storage'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { apiFetch, ApiError } from '../data/apiClient'
 
 export type UserRole = 'technician' | 'supervisor'
 
 export interface Session {
   isAuthenticated: boolean
+  loading: boolean
   name: string
   role: UserRole
   department: string
 }
 
-const DEFAULT_SESSION: Session = {
+const INITIAL_SESSION: Session = {
   isAuthenticated: false,
-  name: 'Faisal Al-Otaibi',
+  loading: true,
+  name: '',
   role: 'technician',
-  department: 'Electrical Maintenance',
+  department: '',
+}
+
+interface ApiUser {
+  id: string
+  name: string
+  username: string
+  role: UserRole
+  department: string
 }
 
 interface SessionContextValue extends Session {
-  login: (details: { name: string; role: UserRole }) => void
-  logout: () => void
-  setRole: (role: UserRole) => void
-  updateProfile: (details: Partial<Pick<Session, 'name' | 'department'>>) => void
+  login: (details: { username: string; password: string }) => Promise<void>
+  logout: () => Promise<void>
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined)
 
-const SESSION_KEY = 'session'
+function toSession(user: ApiUser): Session {
+  return { isAuthenticated: true, loading: false, name: user.name, role: user.role, department: user.department }
+}
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session>(() => readJson(SESSION_KEY, DEFAULT_SESSION))
+  const [session, setSession] = useState<Session>(INITIAL_SESSION)
 
-  const persist = (next: Session) => {
-    setSession(next)
-    writeJson(SESSION_KEY, next)
-  }
+  useEffect(() => {
+    let cancelled = false
+    apiFetch<{ user: ApiUser }>('/auth/me')
+      .then(({ user }) => {
+        if (!cancelled) setSession(toSession(user))
+      })
+      .catch(() => {
+        if (!cancelled) setSession({ ...INITIAL_SESSION, loading: false })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const value = useMemo<SessionContextValue>(
     () => ({
       ...session,
-      login: ({ name, role }) => persist({ ...session, isAuthenticated: true, name, role }),
-      logout: () => persist({ ...session, isAuthenticated: false }),
-      setRole: (role) => persist({ ...session, role }),
-      updateProfile: (details) => persist({ ...session, ...details }),
+      login: async ({ username, password }) => {
+        const { user } = await apiFetch<{ user: ApiUser }>('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ username, password }),
+        })
+        setSession(toSession(user))
+      },
+      logout: async () => {
+        await apiFetch('/auth/logout', { method: 'POST' })
+        setSession({ ...INITIAL_SESSION, loading: false })
+      },
     }),
     [session],
   )
@@ -55,3 +81,5 @@ export function useSession(): SessionContextValue {
   if (!ctx) throw new Error('useSession must be used within a SessionProvider')
   return ctx
 }
+
+export { ApiError }

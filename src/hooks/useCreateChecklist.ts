@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { createChecklist } from '../data/repository'
-import type { ChecklistRecord } from '../types/checklist'
+import type { ChecklistCreateInput, ChecklistRecord } from '../types/checklist'
 
 export function useCreateChecklist() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const submit = async (record: ChecklistRecord): Promise<ChecklistRecord> => {
+  const submit = async (input: ChecklistCreateInput): Promise<ChecklistRecord> => {
     setSubmitting(true)
     setError(null)
     try {
-      return await createChecklist(record)
+      return await createChecklist(input)
     } catch {
       setError('Could not submit this checklist. Please try again.')
       throw new Error('submit failed')

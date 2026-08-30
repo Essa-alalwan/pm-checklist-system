@@ -70,6 +70,9 @@ export interface GeneratorChecklist extends ChecklistBase {
 
 export type ChecklistRecord = LvAcMotorChecklist | GeneratorChecklist
 
+// What the client sends to create a record — the server assigns id/createdAt/status.
+export type ChecklistCreateInput = Omit<ChecklistRecord, 'id' | 'createdAt' | 'status'>
+
 export interface ChecklistTemplateItemDef {
   id: string
   label: string
