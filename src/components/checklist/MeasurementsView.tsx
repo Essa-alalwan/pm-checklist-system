@@ -1,4 +1,4 @@
-import type { GeneratorChecklist, LvAcMotorChecklist } from '../../types/checklist'
+import type { GeneratorChecklist, LvAcMotorChecklist, NumericOrNA } from '../../types/checklist'
 
 type LvSource = { type: 'lv-ac-motor' } & Pick<
   LvAcMotorChecklist,
@@ -12,13 +12,21 @@ type GenSource = { type: 'generator' } & Pick<
 
 type GenericSource = { type: string }
 
-function ReadingTile({ label, value, unit }: { label: string; value: number | undefined; unit: string }) {
+function ReadingTile({ label, value, unit }: { label: string; value: NumericOrNA | undefined; unit: string }) {
   return (
     <div className="rounded-lg border border-border bg-surface-2 px-3 py-2.5">
       <p className="text-[11px] font-medium uppercase tracking-wide text-text-faint">{label}</p>
       <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-text">
-        {value !== undefined ? value : <span className="text-text-faint">—</span>}
-        {value !== undefined && <span className="ml-1 text-xs font-normal text-text-faint">{unit}</span>}
+        {value === undefined ? (
+          <span className="text-text-faint">—</span>
+        ) : value === 'N/A' ? (
+          <span className="text-text-faint">N/A</span>
+        ) : (
+          <>
+            {value}
+            <span className="ml-1 text-xs font-normal text-text-faint">{unit}</span>
+          </>
+        )}
       </p>
     </div>
   )

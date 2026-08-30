@@ -2,7 +2,7 @@ import type { LvAcMotorDraft } from '../../../features/wizard/draftFactory'
 import type { WindingResistanceRow } from '../../../types/checklist'
 import { Card, CardBody, CardHeader } from '../../ui/Card'
 import { NumberField } from '../../ui/NumberField'
-import { inputClasses } from '../../ui/Field'
+import { NumericOrNACellInput } from '../../ui/NumericOrNACellInput'
 
 interface StepMeasurementsLvAcMotorProps {
   draft: LvAcMotorDraft
@@ -36,25 +36,17 @@ export function StepMeasurementsLvAcMotor({ draft, onChange }: StepMeasurementsL
                 <tr key={row.phase}>
                   <td className="py-1 font-mono font-semibold text-text">{row.phase}</td>
                   <td className="py-1 pr-2">
-                    <input
-                      type="number"
-                      step={0.01}
-                      inputMode="decimal"
-                      className={`${inputClasses} min-h-10 font-mono tabular-nums`}
-                      value={row.resistanceOhm ?? ''}
-                      onChange={(e) => updateRow(row.phase, { resistanceOhm: e.target.value === '' ? undefined : Number(e.target.value) })}
-                      aria-label={`${row.phase} resistance in ohms`}
+                    <NumericOrNACellInput
+                      value={row.resistanceOhm}
+                      onChange={(resistanceOhm) => updateRow(row.phase, { resistanceOhm })}
+                      ariaLabel={`${row.phase} resistance in ohms`}
                     />
                   </td>
                   <td className="py-1">
-                    <input
-                      type="number"
-                      step={0.01}
-                      inputMode="decimal"
-                      className={`${inputClasses} min-h-10 font-mono tabular-nums`}
-                      value={row.inductanceMh ?? ''}
-                      onChange={(e) => updateRow(row.phase, { inductanceMh: e.target.value === '' ? undefined : Number(e.target.value) })}
-                      aria-label={`${row.phase} inductance in millihenries`}
+                    <NumericOrNACellInput
+                      value={row.inductanceMh}
+                      onChange={(inductanceMh) => updateRow(row.phase, { inductanceMh })}
+                      ariaLabel={`${row.phase} inductance in millihenries`}
                     />
                   </td>
                 </tr>

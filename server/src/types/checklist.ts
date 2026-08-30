@@ -5,6 +5,10 @@
 
 export type ChecklistItemStatus = 'done' | 'na' | 'flagged'
 
+// A measurement value: a real number, or 'N/A' when a technician can't get a
+// reading (equipment not fitted with that test point, sensor unavailable, etc).
+export type NumericOrNA = number | 'N/A'
+
 export interface ChecklistItemResult {
   id: string
   label: string
@@ -39,41 +43,41 @@ export interface ChecklistBase {
 
 export interface WindingResistanceRow {
   phase: 'R-Y' | 'Y-B' | 'R-B'
-  resistanceOhm?: number
-  inductanceMh?: number
+  resistanceOhm?: NumericOrNA
+  inductanceMh?: NumericOrNA
 }
 
 export interface LvAcMotorChecklist extends ChecklistBase {
   type: 'lv-ac-motor'
   windingResistance: WindingResistanceRow[]
-  spaceHeaterResistanceOhm?: number
-  spaceHeaterInsulationMOhm?: number
-  phaseToEarthInsulationMOhm?: number
-  ambientTempC?: number
-  humidityPercent?: number
+  spaceHeaterResistanceOhm?: NumericOrNA
+  spaceHeaterInsulationMOhm?: NumericOrNA
+  phaseToEarthInsulationMOhm?: NumericOrNA
+  ambientTempC?: NumericOrNA
+  humidityPercent?: NumericOrNA
 }
 
 export interface ShaftGroundingBrush {
   holderNumber: number
-  lengthMm?: number
+  lengthMm?: NumericOrNA
 }
 
 export interface BrushLengthRow {
   id: string
   holderNumber: number
   side: string
-  lengthMm?: number
+  lengthMm?: NumericOrNA
 }
 
 export interface GeneratorChecklist extends ChecklistBase {
   type: 'generator'
   shaftGroundingBrushes: ShaftGroundingBrush[]
   brushLengths: BrushLengthRow[]
-  h2PressureBar?: number
-  ipbPressureBar?: number
-  ipbTempC?: number
-  ipbHumidityPercent?: number
-  gtRunningHours?: number
+  h2PressureBar?: NumericOrNA
+  ipbPressureBar?: NumericOrNA
+  ipbTempC?: NumericOrNA
+  ipbHumidityPercent?: NumericOrNA
+  gtRunningHours?: NumericOrNA
 }
 
 // A supervisor-uploaded checklist type: base sign-off fields + items, nothing

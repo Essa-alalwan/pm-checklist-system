@@ -27,34 +27,38 @@ const baseSchema = z.object({
   items: z.array(itemResultSchema).min(1),
 })
 
+// A measurement is either a real number or the literal "N/A" (a technician
+// couldn't get a reading) — mirrors NumericOrNA in types/checklist.ts.
+const numericOrNASchema = z.union([z.number(), z.literal('N/A')]).optional()
+
 const windingRowSchema = z.object({
   phase: z.enum(['R-Y', 'Y-B', 'R-B']),
-  resistanceOhm: z.number().optional(),
-  inductanceMh: z.number().optional(),
+  resistanceOhm: numericOrNASchema,
+  inductanceMh: numericOrNASchema,
 })
 
 const lvAcMotorSchema = baseSchema.extend({
   type: z.literal('lv-ac-motor'),
   windingResistance: z.array(windingRowSchema),
-  spaceHeaterResistanceOhm: z.number().optional(),
-  spaceHeaterInsulationMOhm: z.number().optional(),
-  phaseToEarthInsulationMOhm: z.number().optional(),
-  ambientTempC: z.number().optional(),
-  humidityPercent: z.number().optional(),
+  spaceHeaterResistanceOhm: numericOrNASchema,
+  spaceHeaterInsulationMOhm: numericOrNASchema,
+  phaseToEarthInsulationMOhm: numericOrNASchema,
+  ambientTempC: numericOrNASchema,
+  humidityPercent: numericOrNASchema,
 })
 
-const shaftBrushSchema = z.object({ holderNumber: z.number(), lengthMm: z.number().optional() })
-const brushRowSchema = z.object({ id: z.string(), holderNumber: z.number(), side: z.string(), lengthMm: z.number().optional() })
+const shaftBrushSchema = z.object({ holderNumber: z.number(), lengthMm: numericOrNASchema })
+const brushRowSchema = z.object({ id: z.string(), holderNumber: z.number(), side: z.string(), lengthMm: numericOrNASchema })
 
 const generatorSchema = baseSchema.extend({
   type: z.literal('generator'),
   shaftGroundingBrushes: z.array(shaftBrushSchema),
   brushLengths: z.array(brushRowSchema),
-  h2PressureBar: z.number().optional(),
-  ipbPressureBar: z.number().optional(),
-  ipbTempC: z.number().optional(),
-  ipbHumidityPercent: z.number().optional(),
-  gtRunningHours: z.number().optional(),
+  h2PressureBar: numericOrNASchema,
+  ipbPressureBar: numericOrNASchema,
+  ipbTempC: numericOrNASchema,
+  ipbHumidityPercent: numericOrNASchema,
+  gtRunningHours: numericOrNASchema,
 })
 
 // Supervisor-uploaded checklist types have no type-specific fields — just the
@@ -139,7 +143,14 @@ recordsRouter.post('/', requireAuth, async (req, res) => {
         })),
       },
       readings: {
-        create: readings.map((r) => ({ key: r.key, groupLabel: r.groupLabel, value: r.value, unit: r.unit, sortOrder: r.sortOrder })),
+        create: readings.map((r) => ({
+          key: r.key,
+          groupLabel: r.groupLabel,
+          value: r.value,
+          textValue: r.textValue,
+          unit: r.unit,
+          sortOrder: r.sortOrder,
+        })),
       },
       auditEvents: {
         create: { action: 'created', actorUserId: req.user!.id },

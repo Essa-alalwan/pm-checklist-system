@@ -333,7 +333,9 @@ async function main() {
         remarks: m.remarks,
         createdByUserId: technician.id,
         items: { create: m.items },
-        readings: { create: m.readings.map((r) => ({ key: r.key, groupLabel: r.groupLabel, value: r.value, unit: r.unit, sortOrder: r.sortOrder })) },
+        readings: {
+          create: m.readings.map((r) => ({ key: r.key, groupLabel: r.groupLabel, value: r.value, textValue: r.textValue, unit: r.unit, sortOrder: r.sortOrder })),
+        },
         auditEvents: { create: { action: 'created', actorUserId: technician.id } },
       },
     })
@@ -356,7 +358,9 @@ async function main() {
         remarks: g.remarks,
         createdByUserId: technician.id,
         items: { create: g.items },
-        readings: { create: g.readings.map((r) => ({ key: r.key, groupLabel: r.groupLabel, value: r.value, unit: r.unit, sortOrder: r.sortOrder })) },
+        readings: {
+          create: g.readings.map((r) => ({ key: r.key, groupLabel: r.groupLabel, value: r.value, textValue: r.textValue, unit: r.unit, sortOrder: r.sortOrder })),
+        },
         auditEvents: { create: { action: 'created', actorUserId: technician.id } },
       },
     })

@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import PDFDocument from 'pdfkit'
-import type { ChecklistRecord, GeneratorChecklist, LvAcMotorChecklist } from '../types/checklist'
+import type { ChecklistRecord, GeneratorChecklist, LvAcMotorChecklist, NumericOrNA } from '../types/checklist'
 
 const INK = '#111827'
 const MUTED = '#6b7280'
@@ -26,6 +26,13 @@ function formatDate(iso: string): string {
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// A measurement is a number, "N/A", or unset — never append a unit to "N/A".
+function formatMeasurement(value: NumericOrNA | undefined, unit: string): string {
+  if (value === undefined) return '—'
+  if (value === 'N/A') return 'N/A'
+  return `${value} ${unit}`
 }
 
 function decodeImageBuffer(dataUrl: string): { buffer: Buffer; kind: 'png' | 'jpeg' } | null {
@@ -300,11 +307,11 @@ export function generateRecordPdf(record: ChecklistRecord, templateLabel: string
     drawKeyValueGrid(
       doc,
       [
-        ['Space Heater Resistance', `${lv.spaceHeaterResistanceOhm ?? '—'} ohm`],
-        ['Space Heater Insulation', `${lv.spaceHeaterInsulationMOhm ?? '—'} Mohm`],
-        ['Phase-Earth Insulation', `${lv.phaseToEarthInsulationMOhm ?? '—'} Mohm`],
-        ['Ambient Temperature', `${lv.ambientTempC ?? '—'} °C`],
-        ['Humidity', `${lv.humidityPercent ?? '—'} %`],
+        ['Space Heater Resistance', formatMeasurement(lv.spaceHeaterResistanceOhm, 'ohm')],
+        ['Space Heater Insulation', formatMeasurement(lv.spaceHeaterInsulationMOhm, 'Mohm')],
+        ['Phase-Earth Insulation', formatMeasurement(lv.phaseToEarthInsulationMOhm, 'Mohm')],
+        ['Ambient Temperature', formatMeasurement(lv.ambientTempC, '°C')],
+        ['Humidity', formatMeasurement(lv.humidityPercent, '%')],
       ],
       3,
     )
@@ -315,7 +322,7 @@ export function generateRecordPdf(record: ChecklistRecord, templateLabel: string
     doc.moveDown(0.3)
     drawKeyValueGrid(
       doc,
-      gen.shaftGroundingBrushes.map((b) => [`Holder ${b.holderNumber}`, `${b.lengthMm ?? '—'} mm`]),
+      gen.shaftGroundingBrushes.map((b) => [`Holder ${b.holderNumber}`, formatMeasurement(b.lengthMm, 'mm')]),
       4,
     )
     if (gen.brushLengths.length > 0) {
@@ -334,11 +341,11 @@ export function generateRecordPdf(record: ChecklistRecord, templateLabel: string
     drawKeyValueGrid(
       doc,
       [
-        ['H2 Pressure', `${gen.h2PressureBar ?? '—'} bar`],
-        ['IPB Pressure', `${gen.ipbPressureBar ?? '—'} bar`],
-        ['IPB Temperature', `${gen.ipbTempC ?? '—'} °C`],
-        ['IPB Humidity', `${gen.ipbHumidityPercent ?? '—'} %`],
-        ['GT Running Hours', String(gen.gtRunningHours ?? '—')],
+        ['H2 Pressure', formatMeasurement(gen.h2PressureBar, 'bar')],
+        ['IPB Pressure', formatMeasurement(gen.ipbPressureBar, 'bar')],
+        ['IPB Temperature', formatMeasurement(gen.ipbTempC, '°C')],
+        ['IPB Humidity', formatMeasurement(gen.ipbHumidityPercent, '%')],
+        ['GT Running Hours', formatMeasurement(gen.gtRunningHours, 'hrs')],
       ],
       3,
     )

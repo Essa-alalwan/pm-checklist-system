@@ -1,8 +1,10 @@
 import { Plus, Trash2 } from 'lucide-react'
 import type { GeneratorDraft } from '../../../features/wizard/draftFactory'
 import type { BrushLengthRow } from '../../../types/checklist'
+import type { NumericOrNA } from '../../../lib/numericOrNA'
 import { Card, CardBody, CardHeader } from '../../ui/Card'
 import { NumberField } from '../../ui/NumberField'
+import { NumericOrNACellInput } from '../../ui/NumericOrNACellInput'
 import { inputClasses } from '../../ui/Field'
 import { generateId } from '../../../lib/id'
 
@@ -12,7 +14,7 @@ interface StepMeasurementsGeneratorProps {
 }
 
 export function StepMeasurementsGenerator({ draft, onChange }: StepMeasurementsGeneratorProps) {
-  const updateShaftBrush = (holderNumber: number, lengthMm: number | undefined) => {
+  const updateShaftBrush = (holderNumber: number, lengthMm: NumericOrNA | undefined) => {
     onChange({
       shaftGroundingBrushes: draft.shaftGroundingBrushes.map((b) => (b.holderNumber === holderNumber ? { ...b, lengthMm } : b)),
     })
@@ -99,14 +101,10 @@ export function StepMeasurementsGenerator({ draft, onChange }: StepMeasurementsG
                       </select>
                     </td>
                     <td className="py-1 pr-2">
-                      <input
-                        type="number"
-                        step={0.1}
-                        inputMode="decimal"
-                        className={`${inputClasses} min-h-10 font-mono tabular-nums`}
-                        value={row.lengthMm ?? ''}
-                        onChange={(e) => updateBrushRow(row.id, { lengthMm: e.target.value === '' ? undefined : Number(e.target.value) })}
-                        aria-label="Length in millimeters"
+                      <NumericOrNACellInput
+                        value={row.lengthMm}
+                        onChange={(lengthMm) => updateBrushRow(row.id, { lengthMm })}
+                        ariaLabel="Length in millimeters"
                       />
                     </td>
                     <td className="py-1">
@@ -144,13 +142,7 @@ export function StepMeasurementsGenerator({ draft, onChange }: StepMeasurementsG
           <NumberField label="IPB Pressure" unit="bar" value={draft.ipbPressureBar} onChange={(v) => onChange({ ipbPressureBar: v })} />
           <NumberField label="IPB Temperature" unit="°C" value={draft.ipbTempC} onChange={(v) => onChange({ ipbTempC: v })} />
           <NumberField label="IPB Humidity" unit="%" value={draft.ipbHumidityPercent} onChange={(v) => onChange({ ipbHumidityPercent: v })} />
-          <NumberField
-            label="GT Running Hours"
-            unit="hrs"
-            step={1}
-            value={draft.gtRunningHours}
-            onChange={(v) => onChange({ gtRunningHours: v })}
-          />
+          <NumberField label="GT Running Hours" unit="hrs" value={draft.gtRunningHours} onChange={(v) => onChange({ gtRunningHours: v })} />
         </CardBody>
       </Card>
     </div>
