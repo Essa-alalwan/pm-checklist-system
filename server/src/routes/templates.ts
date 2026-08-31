@@ -68,7 +68,7 @@ templatesRouter.post('/parse-docx', requireAuth, requireRole('supervisor'), uplo
   }
 
   try {
-    const parsed = await parseChecklistDocx(req.file.buffer)
+    const parsed = await parseChecklistDocx(req.file.buffer, req.file.originalname)
     if (parsed.items.length === 0) {
       res.status(422).json({ error: "Could not find any numbered checklist items in this document. You can still add items manually." })
       return

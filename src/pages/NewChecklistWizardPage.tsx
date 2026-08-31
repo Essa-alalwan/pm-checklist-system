@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Send } from 'lucide-react'
 import type { ChecklistTemplate, ChecklistType } from '../types/checklist'
@@ -70,6 +70,17 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
 
   const { step, data } = state
   const currentStepId = steps[step].id
+
+  // A draft resumed from localStorage (e.g. started before a signature was
+  // ever saved to the account) can be sitting with a blank signature even
+  // though the account now has one — backfill it once, without touching a
+  // draft that already has a real signature drawn into it.
+  useEffect(() => {
+    if (!data.signatureDataUrl && savedSignature) {
+      setState({ step, data: { ...data, signatureDataUrl: savedSignature } as ChecklistDraft })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const patchData = (patch: Partial<ChecklistDraft>) => {
     setState({ step, data: { ...data, ...patch } as ChecklistDraft })
