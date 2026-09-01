@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../db'
 import { requireAuth, requireRole } from '../middleware/requireAuth'
 import { parseChecklistDocx } from '../parsing/parseChecklistDocx'
-import type { ChecklistTemplateDef, ChecklistType } from '../types/checklist'
+import { BUILT_IN_CHECKLIST_TYPES, type ChecklistTemplateDef, type ChecklistType } from '../types/checklist'
 
 export const templatesRouter = Router()
 
@@ -122,4 +122,93 @@ templatesRouter.post('/', requireAuth, requireRole('supervisor'), async (req, re
   }
 
   res.status(201).json(result)
+})
+
+const updateTemplateSchema = z.object({
+  label: z.string().min(1),
+  description: z.string().optional(),
+  items: z.array(z.string().min(1)).min(1),
+})
+
+function isBuiltIn(type: string): boolean {
+  return (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(type)
+}
+
+templatesRouter.patch('/:type', requireAuth, requireRole('supervisor'), async (req, res) => {
+  const { type } = req.params
+  if (isBuiltIn(type)) {
+    res.status(403).json({ error: 'Built-in checklist types cannot be edited.' })
+    return
+  }
+
+  const template = await prisma.checklistTemplate.findUnique({ where: { type } })
+  if (!template) {
+    res.status(404).json({ error: 'Checklist type not found.' })
+    return
+  }
+
+  const recordCount = await prisma.checklistRecord.count({ where: { templateId: template.id } })
+  if (recordCount > 0) {
+    res.status(409).json({ error: `This checklist type has ${recordCount} submitted record${recordCount === 1 ? '' : 's'} and can no longer be edited.` })
+    return
+  }
+
+  const parsed = updateTemplateSchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'A label and at least one item are required.' })
+    return
+  }
+  const { label, description, items } = parsed.data
+  const shortLabel = label.length <= 24 ? label : label.split(' ').slice(0, 3).join(' ')
+
+  const updated = await prisma.checklistTemplate.update({
+    where: { id: template.id },
+    data: {
+      label,
+      shortLabel,
+      description: description ?? '',
+      items: {
+        deleteMany: {},
+        create: items.map((text, index) => ({
+          itemKey: `item-${index + 1}`,
+          label: text,
+          sortOrder: index,
+        })),
+      },
+    },
+    include: { items: { orderBy: { sortOrder: 'asc' } } },
+  })
+
+  const result: ChecklistTemplateDef = {
+    type: updated.type,
+    label: updated.label,
+    shortLabel: updated.shortLabel,
+    description: updated.description,
+    items: updated.items.map((i) => ({ id: i.itemKey, label: i.label })),
+  }
+
+  res.json(result)
+})
+
+templatesRouter.delete('/:type', requireAuth, requireRole('supervisor'), async (req, res) => {
+  const { type } = req.params
+  if (isBuiltIn(type)) {
+    res.status(403).json({ error: 'Built-in checklist types cannot be deleted.' })
+    return
+  }
+
+  const template = await prisma.checklistTemplate.findUnique({ where: { type } })
+  if (!template) {
+    res.status(404).json({ error: 'Checklist type not found.' })
+    return
+  }
+
+  const recordCount = await prisma.checklistRecord.count({ where: { templateId: template.id } })
+  if (recordCount > 0) {
+    res.status(409).json({ error: `This checklist type has ${recordCount} submitted record${recordCount === 1 ? '' : 's'} and cannot be deleted.` })
+    return
+  }
+
+  await prisma.checklistTemplate.delete({ where: { id: template.id } })
+  res.status(204).end()
 })

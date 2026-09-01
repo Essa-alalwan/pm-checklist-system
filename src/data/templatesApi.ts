@@ -22,3 +22,11 @@ export interface CreateChecklistTemplateInput {
 export async function createChecklistTemplate(input: CreateChecklistTemplateInput): Promise<ChecklistTemplate> {
   return apiFetch<ChecklistTemplate>('/templates', { method: 'POST', body: JSON.stringify(input) })
 }
+
+export async function updateChecklistTemplate(type: string, input: CreateChecklistTemplateInput): Promise<ChecklistTemplate> {
+  return apiFetch<ChecklistTemplate>(`/templates/${type}`, { method: 'PATCH', body: JSON.stringify(input) })
+}
+
+export async function deleteChecklistTemplate(type: string): Promise<void> {
+  await apiFetch<void>(`/templates/${type}`, { method: 'DELETE' })
+}

@@ -52,7 +52,10 @@ export default function DashboardPage() {
   const { stats, recent, loading, error } = useDashboardStats()
   const { templates, loading: templatesLoading } = useTemplates()
   const { name } = useSession()
-  const firstName = name.split(' ')[0]
+  // Skip a leading honorific ("Eng.", "Dr.", etc.) so the greeting uses the
+  // technician's actual first name instead of just the title.
+  const nameParts = name.trim().split(/\s+/)
+  const firstName = nameParts.length > 1 && nameParts[0].endsWith('.') ? nameParts[1] : nameParts[0]
 
   return (
     <div>

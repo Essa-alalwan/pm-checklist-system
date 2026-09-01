@@ -4,6 +4,8 @@ import { RequireAuth } from './components/layout/RequireAuth'
 import { SessionProvider } from './context/SessionContext'
 import { TemplatesProvider } from './context/TemplatesContext'
 import DashboardPage from './pages/DashboardPage'
+import EditChecklistPage from './pages/EditChecklistPage'
+import EditChecklistTypePage from './pages/EditChecklistTypePage'
 import LoginPage from './pages/LoginPage'
 import NewChecklistTypePage from './pages/NewChecklistTypePage'
 import NewChecklistWizardPage from './pages/NewChecklistWizardPage'
@@ -26,8 +28,10 @@ function App() {
               <Route path="checklists/new" element={<NewChecklistTypePage />} />
               <Route path="checklists/new/upload" element={<UploadChecklistTypePage />} />
               <Route path="checklists/new/:type" element={<NewChecklistWizardPage />} />
+              <Route path="checklists/types/:type/edit" element={<EditChecklistTypePage />} />
               <Route path="records" element={<RecordsPage />} />
               <Route path="records/:id" element={<RecordDetailPage />} />
+              <Route path="records/:id/edit" element={<EditChecklistPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>

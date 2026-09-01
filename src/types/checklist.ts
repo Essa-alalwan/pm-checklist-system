@@ -35,6 +35,7 @@ export interface ChecklistBase {
   remarks?: string
   items: ChecklistItemResult[]
   createdAt: string
+  createdByUserId: string
 }
 
 export interface WindingResistanceRow {
@@ -84,8 +85,9 @@ export interface GenericChecklist extends ChecklistBase {
 
 export type ChecklistRecord = LvAcMotorChecklist | GeneratorChecklist | GenericChecklist
 
-// What the client sends to create a record — the server assigns id/createdAt/status.
-export type ChecklistCreateInput = Omit<ChecklistRecord, 'id' | 'createdAt' | 'status'>
+// What the client sends to create or update a record — the server assigns
+// id/createdAt/status/createdByUserId.
+export type ChecklistCreateInput = Omit<ChecklistRecord, 'id' | 'createdAt' | 'status' | 'createdByUserId'>
 
 export interface ChecklistTemplateItemDef {
   id: string

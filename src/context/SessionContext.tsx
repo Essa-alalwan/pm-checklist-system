@@ -6,6 +6,7 @@ export type UserRole = 'technician' | 'supervisor'
 export interface Session {
   isAuthenticated: boolean
   loading: boolean
+  userId: string
   name: string
   role: UserRole
   department: string
@@ -15,6 +16,7 @@ export interface Session {
 const INITIAL_SESSION: Session = {
   isAuthenticated: false,
   loading: true,
+  userId: '',
   name: '',
   role: 'technician',
   department: '',
@@ -39,7 +41,15 @@ interface SessionContextValue extends Session {
 const SessionContext = createContext<SessionContextValue | undefined>(undefined)
 
 function toSession(user: ApiUser): Session {
-  return { isAuthenticated: true, loading: false, name: user.name, role: user.role, department: user.department, signatureDataUrl: user.signatureDataUrl }
+  return {
+    isAuthenticated: true,
+    loading: false,
+    userId: user.id,
+    name: user.name,
+    role: user.role,
+    department: user.department,
+    signatureDataUrl: user.signatureDataUrl,
+  }
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {

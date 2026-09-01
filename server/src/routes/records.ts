@@ -189,6 +189,109 @@ recordsRouter.patch('/:id/review', requireAuth, requireRole('supervisor'), async
   res.json(toApiRecord(updated))
 })
 
+function canModify(record: { createdByUserId: string; status: string }, user: { id: string; role: string }): { ok: true } | { ok: false; status: number; error: string } {
+  const isOwner = record.createdByUserId === user.id
+  const isSupervisor = user.role === 'supervisor'
+  if (!isOwner && !isSupervisor) {
+    return { ok: false, status: 403, error: 'You can only edit or delete your own checklist records.' }
+  }
+  if (record.status === 'reviewed') {
+    return { ok: false, status: 403, error: 'This record has already been reviewed and can no longer be edited or deleted.' }
+  }
+  return { ok: true }
+}
+
+recordsRouter.patch('/:id', requireAuth, async (req, res) => {
+  const existing = await prisma.checklistRecord.findUnique({ where: { id: req.params.id }, include: { template: { include: { items: true } } } })
+  if (!existing) {
+    res.status(404).json({ error: 'Record not found.' })
+    return
+  }
+
+  const permission = canModify(existing, req.user!)
+  if (!permission.ok) {
+    res.status(permission.status).json({ error: permission.error })
+    return
+  }
+
+  const parsed = parseCreateRecordBody(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid checklist payload.', details: parsed.error.flatten() })
+    return
+  }
+  const input = parsed.data
+
+  if (input.type !== existing.template.type) {
+    res.status(400).json({ error: 'Cannot change the checklist type of an existing record.' })
+    return
+  }
+
+  const templateItemIdByKey = new Map(existing.template.items.map((i) => [i.itemKey, i.id]))
+  const unknownItem = input.items.find((item) => !templateItemIdByKey.has(item.id))
+  if (unknownItem) {
+    res.status(400).json({ error: `Unknown checklist item "${unknownItem.id}" for this template.` })
+    return
+  }
+
+  const readings = buildReadingsForRecord(input)
+
+  const updated = await prisma.checklistRecord.update({
+    where: { id: existing.id },
+    data: {
+      kksCode: input.kksCode,
+      equipmentDescription: input.equipmentDescription,
+      date: input.date,
+      preparedBy: input.preparedBy,
+      doneBy: input.doneBy,
+      numberOfHelpers: input.numberOfHelpers,
+      signatureDataUrl: input.signatureDataUrl,
+      remarks: input.remarks,
+      items: {
+        deleteMany: {},
+        create: input.items.map((item) => ({
+          status: item.status,
+          note: item.note,
+          templateItemId: templateItemIdByKey.get(item.id)!,
+        })),
+      },
+      readings: {
+        deleteMany: {},
+        create: readings.map((r) => ({
+          key: r.key,
+          groupLabel: r.groupLabel,
+          value: r.value,
+          textValue: r.textValue,
+          unit: r.unit,
+          sortOrder: r.sortOrder,
+        })),
+      },
+      auditEvents: {
+        create: { action: 'edited', actorUserId: req.user!.id },
+      },
+    },
+    include: recordInclude,
+  })
+
+  res.json(toApiRecord(updated))
+})
+
+recordsRouter.delete('/:id', requireAuth, async (req, res) => {
+  const existing = await prisma.checklistRecord.findUnique({ where: { id: req.params.id } })
+  if (!existing) {
+    res.status(404).json({ error: 'Record not found.' })
+    return
+  }
+
+  const permission = canModify(existing, req.user!)
+  if (!permission.ok) {
+    res.status(permission.status).json({ error: permission.error })
+    return
+  }
+
+  await prisma.checklistRecord.delete({ where: { id: existing.id } })
+  res.status(204).end()
+})
+
 recordsRouter.get('/:id/pdf', requireAuth, async (req, res) => {
   const record = await prisma.checklistRecord.findUnique({ where: { id: req.params.id }, include: recordInclude })
   if (!record) {

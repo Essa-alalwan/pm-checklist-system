@@ -1,8 +1,8 @@
 import type { ChecklistTemplateItemDef, GeneratorChecklist, GenericChecklist, LvAcMotorChecklist, ChecklistType } from '../../types/checklist'
 
-export type LvAcMotorDraft = Omit<LvAcMotorChecklist, 'id' | 'createdAt' | 'status'>
-export type GeneratorDraft = Omit<GeneratorChecklist, 'id' | 'createdAt' | 'status'>
-export type GenericDraft = Omit<GenericChecklist, 'id' | 'createdAt' | 'status'>
+export type LvAcMotorDraft = Omit<LvAcMotorChecklist, 'id' | 'createdAt' | 'status' | 'createdByUserId'>
+export type GeneratorDraft = Omit<GeneratorChecklist, 'id' | 'createdAt' | 'status' | 'createdByUserId'>
+export type GenericDraft = Omit<GenericChecklist, 'id' | 'createdAt' | 'status' | 'createdByUserId'>
 export type ChecklistDraft = LvAcMotorDraft | GeneratorDraft | GenericDraft
 
 function today(): string {

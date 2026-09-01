@@ -39,6 +39,7 @@ export interface ChecklistBase {
   remarks?: string
   items: ChecklistItemResult[]
   createdAt: string
+  createdByUserId: string
 }
 
 export interface WindingResistanceRow {

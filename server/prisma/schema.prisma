@@ -38,6 +38,7 @@ enum ItemStatus {
 enum AuditAction {
   created
   reviewed
+  edited
 }
 
 model User {

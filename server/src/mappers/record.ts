@@ -36,6 +36,7 @@ export function toApiRecord(db: DbRecordWithRelations): ChecklistRecord {
       .sort((a, b) => a.templateItem.sortOrder - b.templateItem.sortOrder)
       .map((i) => ({ id: i.templateItem.itemKey, label: i.templateItem.label, status: i.status, note: i.note ?? undefined })),
     createdAt: db.createdAt.toISOString(),
+    createdByUserId: db.createdByUserId,
   }
 
   const type = db.template.type as ChecklistType

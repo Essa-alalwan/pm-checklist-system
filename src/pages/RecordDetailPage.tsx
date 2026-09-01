@@ -1,8 +1,9 @@
 import { useId, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Download, FileQuestion } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, CheckCircle2, Download, FileQuestion, Pencil, Trash2 } from 'lucide-react'
 import { useChecklist } from '../hooks/useChecklist'
 import { useReviewChecklist } from '../hooks/useReviewChecklist'
+import { useDeleteChecklist } from '../hooks/useDeleteChecklist'
 import { useSession } from '../context/SessionContext'
 import { ChecklistDetailView } from '../components/checklist/ChecklistDetailView'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
@@ -12,6 +13,7 @@ import { Field, inputClasses } from '../components/ui/Field'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { Skeleton } from '../components/ui/Skeleton'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
 function ReviewPanel({ recordId, onReviewed }: { recordId: string; onReviewed: () => void }) {
   const { name, role } = useSession()
@@ -51,7 +53,22 @@ function ReviewPanel({ recordId, onReviewed }: { recordId: string; onReviewed: (
 export default function RecordDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { record, loading, error, notFound, refetch } = useChecklist(id)
-  const { role } = useSession()
+  const { role, userId } = useSession()
+  const navigate = useNavigate()
+  const { submit: submitDelete, deleting, error: deleteError } = useDeleteChecklist()
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  const canModify = record !== undefined && (role === 'supervisor' || record.createdByUserId === userId) && record.status !== 'reviewed'
+
+  const handleDelete = async () => {
+    if (!record) return
+    try {
+      await submitDelete(record.id)
+      navigate('/records')
+    } catch {
+      // surfaced via deleteError below
+    }
+  }
 
   return (
     <div>
@@ -61,15 +78,29 @@ export default function RecordDetailPage() {
           Back to records
         </Link>
         {!loading && !error && !notFound && record && (
-          <a
-            href={`/api/records/${record.id}/pdf`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={getButtonClasses('secondary', 'md')}
-          >
-            <Download className="size-4" aria-hidden="true" />
-            Download PDF
-          </a>
+          <div className="flex items-center gap-2">
+            {canModify && (
+              <>
+                <Link to={`/records/${record.id}/edit`} className={getButtonClasses('secondary', 'md')}>
+                  <Pencil className="size-4" aria-hidden="true" />
+                  Edit
+                </Link>
+                <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  Delete
+                </Button>
+              </>
+            )}
+            <a
+              href={`/api/records/${record.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={getButtonClasses('secondary', 'md')}
+            >
+              <Download className="size-4" aria-hidden="true" />
+              Download PDF
+            </a>
+          </div>
         )}
       </div>
 
@@ -85,10 +116,24 @@ export default function RecordDetailPage() {
         <EmptyState icon={FileQuestion} title="Record not found" description="This checklist record may have been removed." />
       ) : (
         <div className="flex flex-col gap-5">
+          {deleteError && (
+            <p role="alert" className="text-sm font-medium text-critical">
+              {deleteError}
+            </p>
+          )}
           <ChecklistDetailView record={record} />
           {role === 'supervisor' && record.status !== 'reviewed' && <ReviewPanel recordId={record.id} onReviewed={refetch} />}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this checklist record?"
+        description="This permanently removes the submitted checklist and cannot be undone."
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   )
 }

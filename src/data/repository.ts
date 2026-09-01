@@ -50,6 +50,14 @@ export async function reviewChecklist(id: string, reviewedBy: string): Promise<C
   return apiFetch<ChecklistRecord>(`/records/${id}/review`, { method: 'PATCH', body: JSON.stringify({ reviewedBy }) })
 }
 
+export async function updateChecklist(id: string, input: ChecklistCreateInput): Promise<ChecklistRecord> {
+  return apiFetch<ChecklistRecord>(`/records/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+}
+
+export async function deleteChecklist(id: string): Promise<void> {
+  await apiFetch<void>(`/records/${id}`, { method: 'DELETE' })
+}
+
 export interface DashboardStats {
   recordsThisWeek: number
   flaggedAwaitingReview: number
