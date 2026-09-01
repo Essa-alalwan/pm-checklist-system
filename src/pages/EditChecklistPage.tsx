@@ -15,8 +15,10 @@ import { StepJobInfo } from '../components/checklist/wizard/StepJobInfo'
 import { StepChecklistItems } from '../components/checklist/wizard/StepChecklistItems'
 import { StepMeasurementsLvAcMotor } from '../components/checklist/wizard/StepMeasurementsLvAcMotor'
 import { StepMeasurementsGenerator } from '../components/checklist/wizard/StepMeasurementsGenerator'
+import { StepMeasurementsGeneric } from '../components/checklist/wizard/StepMeasurementsGeneric'
 import { StepRemarksSignature } from '../components/checklist/wizard/StepRemarksSignature'
 import { StepReview } from '../components/checklist/wizard/StepReview'
+import type { GenericDraft } from '../features/wizard/draftFactory'
 import { Skeleton } from '../components/ui/Skeleton'
 import { ErrorState } from '../components/ui/ErrorState'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -43,7 +45,8 @@ function draftFromRecord(record: ChecklistRecord): ChecklistDraft {
 
 function EditChecklistInner({ record, template }: { record: ChecklistRecord; template: ChecklistTemplate }) {
   const navigate = useNavigate()
-  const hasMeasurements = (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(template.type)
+  const isBuiltIn = (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(template.type)
+  const hasMeasurements = isBuiltIn || template.measurementFields.length > 0 || template.logFields.length > 0
   const steps = useMemo(() => buildSteps(hasMeasurements), [hasMeasurements])
   const { submit, submitting, error: submitError } = useUpdateChecklist()
 
@@ -150,8 +153,17 @@ function EditChecklistInner({ record, template }: { record: ChecklistRecord; tem
       {currentStepId === 'measurements' &&
         (data.type === 'lv-ac-motor' ? (
           <StepMeasurementsLvAcMotor draft={data as LvAcMotorDraft} onChange={(patch) => patchData(patch)} />
-        ) : (
+        ) : data.type === 'generator' ? (
           <StepMeasurementsGenerator draft={data as GeneratorDraft} onChange={(patch) => patchData(patch)} />
+        ) : (
+          <StepMeasurementsGeneric
+            measurementFields={template.measurementFields}
+            measurements={(data as GenericDraft).measurements}
+            onChange={(measurements) => patchData({ measurements } as Partial<ChecklistDraft>)}
+            logFields={template.logFields}
+            logs={(data as GenericDraft).logs}
+            onLogsChange={(logs) => patchData({ logs } as Partial<ChecklistDraft>)}
+          />
         ))}
       {currentStepId === 'signoff' && (
         <StepRemarksSignature draft={data} signatureError={blockingMessage ? signatureError : null} onChange={patchData} />

@@ -2,9 +2,33 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../db'
 import { requireAuth, requireRole } from '../middleware/requireAuth'
-import { buildReadingsForRecord, recordInclude, toApiRecord } from '../mappers/record'
+import { buildLogCellsForRecord, buildReadingsForRecord, recordInclude, toApiRecord } from '../mappers/record'
 import { generateRecordPdf } from '../pdf/generateRecordPdf'
+import type { ChecklistTemplateLogFieldDef, ChecklistTemplateMeasurementFieldDef } from '../types/checklist'
 import type { Prisma } from '@prisma/client'
+
+function toMeasurementFieldDefs(
+  rows: { id: string; groupLabel: string | null; rowLabel: string | null; columnLabel: string; unit: string | null; fieldType: string }[],
+): ChecklistTemplateMeasurementFieldDef[] {
+  return rows.map((f) => ({
+    id: f.id,
+    groupLabel: f.groupLabel ?? undefined,
+    rowLabel: f.rowLabel ?? undefined,
+    columnLabel: f.columnLabel,
+    unit: f.unit ?? undefined,
+    fieldType: f.fieldType as 'text' | 'number',
+  }))
+}
+
+function toLogFieldDefs(rows: { id: string; groupLabel: string; columnLabel: string; fieldType: string; unit: string | null }[]): ChecklistTemplateLogFieldDef[] {
+  return rows.map((f) => ({
+    id: f.id,
+    groupLabel: f.groupLabel,
+    columnLabel: f.columnLabel,
+    fieldType: f.fieldType as 'text' | 'number',
+    unit: f.unit ?? undefined,
+  }))
+}
 
 export const recordsRouter = Router()
 
@@ -61,11 +85,23 @@ const generatorSchema = baseSchema.extend({
   gtRunningHours: numericOrNASchema,
 })
 
-// Supervisor-uploaded checklist types have no type-specific fields — just the
-// base sign-off info and items. `type` isn't a literal here (it's whatever
-// slug the template was given), so this can't join the two schemas above in
-// a z.discriminatedUnion — dispatch on `type` manually instead.
-const genericSchema = baseSchema.extend({ type: z.string().min(1) })
+// A cell value is either free text or a numeric-or-NA value, depending on
+// the template's declared field type for that column — used for both fixed
+// measurement fields and repeatable log rows.
+const cellValueSchema = z.union([z.string(), z.number(), z.literal('N/A')]).optional()
+const logRowValueSchema = z.record(z.string(), cellValueSchema)
+
+// Supervisor-uploaded checklist types have no named type-specific fields —
+// just the base sign-off info, items, and whatever measurement fields the
+// template defines (keyed by the ChecklistTemplateMeasurementField id).
+// `type` isn't a literal here (it's whatever slug the template was given),
+// so this can't join the two schemas above in a z.discriminatedUnion —
+// dispatch on `type` manually instead.
+const genericSchema = baseSchema.extend({
+  type: z.string().min(1),
+  measurements: z.record(z.string(), cellValueSchema).optional(),
+  logs: z.record(z.string(), z.array(logRowValueSchema)).optional(),
+})
 
 function parseCreateRecordBody(body: unknown) {
   const type = (body as { type?: unknown } | null)?.type
@@ -107,7 +143,10 @@ recordsRouter.post('/', requireAuth, async (req, res) => {
   }
   const input = parsed.data
 
-  const template = await prisma.checklistTemplate.findUnique({ where: { type: input.type }, include: { items: true } })
+  const template = await prisma.checklistTemplate.findUnique({
+    where: { type: input.type },
+    include: { items: true, measurementFields: true, logFields: true },
+  })
   if (!template) {
     res.status(400).json({ error: `Unknown checklist type "${input.type}".` })
     return
@@ -120,7 +159,28 @@ recordsRouter.post('/', requireAuth, async (req, res) => {
     return
   }
 
-  const readings = buildReadingsForRecord(input)
+  const measurementFieldDefs = toMeasurementFieldDefs(template.measurementFields)
+  if ('measurements' in input && input.measurements) {
+    const validFieldIds = new Set(measurementFieldDefs.map((f) => f.id))
+    const unknownField = Object.keys(input.measurements).find((id) => !validFieldIds.has(id))
+    if (unknownField) {
+      res.status(400).json({ error: `Unknown measurement field "${unknownField}" for this template.` })
+      return
+    }
+  }
+
+  const logFieldDefs = toLogFieldDefs(template.logFields)
+  if ('logs' in input && input.logs) {
+    const validGroups = new Set(logFieldDefs.map((f) => f.groupLabel))
+    const unknownGroup = Object.keys(input.logs).find((g) => !validGroups.has(g))
+    if (unknownGroup) {
+      res.status(400).json({ error: `Unknown log table "${unknownGroup}" for this template.` })
+      return
+    }
+  }
+
+  const readings = buildReadingsForRecord(input, measurementFieldDefs)
+  const logCells = buildLogCellsForRecord(input, logFieldDefs)
 
   const created = await prisma.checklistRecord.create({
     data: {
@@ -150,6 +210,15 @@ recordsRouter.post('/', requireAuth, async (req, res) => {
           textValue: r.textValue,
           unit: r.unit,
           sortOrder: r.sortOrder,
+        })),
+      },
+      logCells: {
+        create: logCells.map((c) => ({
+          groupLabel: c.groupLabel,
+          rowIndex: c.rowIndex,
+          templateLogFieldId: c.templateLogFieldId,
+          textValue: c.textValue,
+          numericValue: c.numericValue,
         })),
       },
       auditEvents: {
@@ -202,7 +271,10 @@ function canModify(record: { createdByUserId: string; status: string }, user: { 
 }
 
 recordsRouter.patch('/:id', requireAuth, async (req, res) => {
-  const existing = await prisma.checklistRecord.findUnique({ where: { id: req.params.id }, include: { template: { include: { items: true } } } })
+  const existing = await prisma.checklistRecord.findUnique({
+    where: { id: req.params.id },
+    include: { template: { include: { items: true, measurementFields: true, logFields: true } } },
+  })
   if (!existing) {
     res.status(404).json({ error: 'Record not found.' })
     return
@@ -233,7 +305,28 @@ recordsRouter.patch('/:id', requireAuth, async (req, res) => {
     return
   }
 
-  const readings = buildReadingsForRecord(input)
+  const measurementFieldDefs = toMeasurementFieldDefs(existing.template.measurementFields)
+  if ('measurements' in input && input.measurements) {
+    const validFieldIds = new Set(measurementFieldDefs.map((f) => f.id))
+    const unknownField = Object.keys(input.measurements).find((id) => !validFieldIds.has(id))
+    if (unknownField) {
+      res.status(400).json({ error: `Unknown measurement field "${unknownField}" for this template.` })
+      return
+    }
+  }
+
+  const logFieldDefs = toLogFieldDefs(existing.template.logFields)
+  if ('logs' in input && input.logs) {
+    const validGroups = new Set(logFieldDefs.map((f) => f.groupLabel))
+    const unknownGroup = Object.keys(input.logs).find((g) => !validGroups.has(g))
+    if (unknownGroup) {
+      res.status(400).json({ error: `Unknown log table "${unknownGroup}" for this template.` })
+      return
+    }
+  }
+
+  const readings = buildReadingsForRecord(input, measurementFieldDefs)
+  const logCells = buildLogCellsForRecord(input, logFieldDefs)
 
   const updated = await prisma.checklistRecord.update({
     where: { id: existing.id },
@@ -263,6 +356,16 @@ recordsRouter.patch('/:id', requireAuth, async (req, res) => {
           textValue: r.textValue,
           unit: r.unit,
           sortOrder: r.sortOrder,
+        })),
+      },
+      logCells: {
+        deleteMany: {},
+        create: logCells.map((c) => ({
+          groupLabel: c.groupLabel,
+          rowIndex: c.rowIndex,
+          templateLogFieldId: c.templateLogFieldId,
+          textValue: c.textValue,
+          numericValue: c.numericValue,
         })),
       },
       auditEvents: {
@@ -302,5 +405,5 @@ recordsRouter.get('/:id/pdf', requireAuth, async (req, res) => {
   const apiRecord = toApiRecord(record)
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `inline; filename="${apiRecord.kksCode || 'checklist'}.pdf"`)
-  generateRecordPdf(apiRecord, record.template.label).pipe(res)
+  generateRecordPdf(apiRecord, record.template.label, toMeasurementFieldDefs(record.template.measurementFields), toLogFieldDefs(record.template.logFields)).pipe(res)
 })

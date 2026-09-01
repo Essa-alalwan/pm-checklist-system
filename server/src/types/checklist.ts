@@ -81,10 +81,19 @@ export interface GeneratorChecklist extends ChecklistBase {
   gtRunningHours?: NumericOrNA
 }
 
-// A supervisor-uploaded checklist type: base sign-off fields + items, nothing
-// type-specific. `type` is guaranteed to NOT be one of BUILT_IN_CHECKLIST_TYPES.
+// One row a technician added to a repeatable-row log, keyed by the log
+// field's own id. A text column holds a plain string; a number column holds
+// a NumericOrNA (same "N/A" convention as fixed measurement fields).
+export type LogRowValue = Record<string, string | NumericOrNA | undefined>
+
+// A supervisor-uploaded checklist type: base sign-off fields + items, plus
+// whatever measurement fields and log tables the template defines (empty
+// for items-only types). `type` is guaranteed to NOT be one of
+// BUILT_IN_CHECKLIST_TYPES.
 export interface GenericChecklist extends ChecklistBase {
   type: string
+  measurements: LogRowValue
+  logs: Record<string, LogRowValue[]>
 }
 
 export type ChecklistRecord = LvAcMotorChecklist | GeneratorChecklist | GenericChecklist
@@ -94,10 +103,36 @@ export interface ChecklistTemplateItemDef {
   label: string
 }
 
+// One fillable measurement cell on a custom checklist type. See
+// ChecklistTemplateMeasurementField in schema.prisma for the pivot rules:
+// fields sharing a groupLabel render together; more than one distinct
+// rowLabel in a group makes it a real table, otherwise it's a flat field list.
+export interface ChecklistTemplateMeasurementFieldDef {
+  id: string
+  groupLabel?: string
+  rowLabel?: string
+  columnLabel: string
+  unit?: string
+  fieldType: 'text' | 'number'
+}
+
+// A column definition for a repeatable-row log table — for source tables
+// whose row count isn't fixed. A template can define more than one log,
+// distinguished by groupLabel.
+export interface ChecklistTemplateLogFieldDef {
+  id: string
+  groupLabel: string
+  columnLabel: string
+  fieldType: 'text' | 'number'
+  unit?: string
+}
+
 export interface ChecklistTemplateDef {
   type: ChecklistType
   label: string
   shortLabel: string
   description: string
   items: ChecklistTemplateItemDef[]
+  measurementFields: ChecklistTemplateMeasurementFieldDef[]
+  logFields: ChecklistTemplateLogFieldDef[]
 }

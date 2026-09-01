@@ -76,5 +76,7 @@ export function createEmptyGenericDraft(
     signatureDataUrl,
     remarks: '',
     items: templateItems.map((i) => ({ id: i.id, label: i.label, status: 'pending' as const, note: undefined })),
+    measurements: {},
+    logs: {},
   }
 }

@@ -44,21 +44,52 @@ async function uniqueTemplateType(base: string): Promise<string> {
   }
 }
 
-templatesRouter.get('/', async (_req, res) => {
-  const templates = await prisma.checklistTemplate.findMany({
-    include: { items: { orderBy: { sortOrder: 'asc' } } },
-    orderBy: { createdAt: 'asc' },
-  })
+const templateInclude = {
+  items: { orderBy: { sortOrder: 'asc' as const } },
+  measurementFields: { orderBy: { sortOrder: 'asc' as const } },
+  logFields: { orderBy: { sortOrder: 'asc' as const } },
+}
 
-  const result: ChecklistTemplateDef[] = templates.map((t) => ({
+function toTemplateDef(t: {
+  type: string
+  label: string
+  shortLabel: string
+  description: string
+  items: { itemKey: string; label: string }[]
+  measurementFields: { id: string; groupLabel: string | null; rowLabel: string | null; columnLabel: string; unit: string | null; fieldType: string }[]
+  logFields: { id: string; groupLabel: string; columnLabel: string; fieldType: string; unit: string | null }[]
+}): ChecklistTemplateDef {
+  return {
     type: t.type as ChecklistType,
     label: t.label,
     shortLabel: t.shortLabel,
     description: t.description,
     items: t.items.map((i) => ({ id: i.itemKey, label: i.label })),
-  }))
+    measurementFields: t.measurementFields.map((f) => ({
+      id: f.id,
+      groupLabel: f.groupLabel ?? undefined,
+      rowLabel: f.rowLabel ?? undefined,
+      columnLabel: f.columnLabel,
+      unit: f.unit ?? undefined,
+      fieldType: f.fieldType as 'text' | 'number',
+    })),
+    logFields: t.logFields.map((f) => ({
+      id: f.id,
+      groupLabel: f.groupLabel,
+      columnLabel: f.columnLabel,
+      fieldType: f.fieldType as 'text' | 'number',
+      unit: f.unit ?? undefined,
+    })),
+  }
+}
 
-  res.json(result)
+templatesRouter.get('/', async (_req, res) => {
+  const templates = await prisma.checklistTemplate.findMany({
+    include: templateInclude,
+    orderBy: { createdAt: 'asc' },
+  })
+
+  res.json(templates.map(toTemplateDef))
 })
 
 templatesRouter.post('/parse-docx', requireAuth, requireRole('supervisor'), upload.single('file'), async (req, res) => {
@@ -79,10 +110,27 @@ templatesRouter.post('/parse-docx', requireAuth, requireRole('supervisor'), uplo
   }
 })
 
+const measurementFieldSchema = z.object({
+  groupLabel: z.string().optional(),
+  rowLabel: z.string().optional(),
+  columnLabel: z.string().min(1),
+  unit: z.string().optional(),
+  fieldType: z.enum(['text', 'number']).default('number'),
+})
+
+const logFieldSchema = z.object({
+  groupLabel: z.string().min(1),
+  columnLabel: z.string().min(1),
+  fieldType: z.enum(['text', 'number']),
+  unit: z.string().optional(),
+})
+
 const createTemplateSchema = z.object({
   label: z.string().min(1),
   description: z.string().optional(),
   items: z.array(z.string().min(1)).min(1),
+  measurementFields: z.array(measurementFieldSchema).optional(),
+  logFields: z.array(logFieldSchema).optional(),
 })
 
 templatesRouter.post('/', requireAuth, requireRole('supervisor'), async (req, res) => {
@@ -91,7 +139,7 @@ templatesRouter.post('/', requireAuth, requireRole('supervisor'), async (req, re
     res.status(400).json({ error: 'A label and at least one item are required.' })
     return
   }
-  const { label, description, items } = parsed.data
+  const { label, description, items, measurementFields, logFields } = parsed.data
 
   const type = await uniqueTemplateType(slugify(label))
   const shortLabel = label.length <= 24 ? label : label.split(' ').slice(0, 3).join(' ')
@@ -109,25 +157,38 @@ templatesRouter.post('/', requireAuth, requireRole('supervisor'), async (req, re
           sortOrder: index,
         })),
       },
+      measurementFields: {
+        create: (measurementFields ?? []).map((f, index) => ({
+          groupLabel: f.groupLabel,
+          rowLabel: f.rowLabel,
+          columnLabel: f.columnLabel,
+          unit: f.unit,
+          fieldType: f.fieldType,
+          sortOrder: index,
+        })),
+      },
+      logFields: {
+        create: (logFields ?? []).map((f, index) => ({
+          groupLabel: f.groupLabel,
+          columnLabel: f.columnLabel,
+          fieldType: f.fieldType,
+          unit: f.unit,
+          sortOrder: index,
+        })),
+      },
     },
-    include: { items: { orderBy: { sortOrder: 'asc' } } },
+    include: templateInclude,
   })
 
-  const result: ChecklistTemplateDef = {
-    type: template.type,
-    label: template.label,
-    shortLabel: template.shortLabel,
-    description: template.description,
-    items: template.items.map((i) => ({ id: i.itemKey, label: i.label })),
-  }
-
-  res.status(201).json(result)
+  res.status(201).json(toTemplateDef(template))
 })
 
 const updateTemplateSchema = z.object({
   label: z.string().min(1),
   description: z.string().optional(),
   items: z.array(z.string().min(1)).min(1),
+  measurementFields: z.array(measurementFieldSchema).optional(),
+  logFields: z.array(logFieldSchema).optional(),
 })
 
 function isBuiltIn(type: string): boolean {
@@ -158,7 +219,7 @@ templatesRouter.patch('/:type', requireAuth, requireRole('supervisor'), async (r
     res.status(400).json({ error: 'A label and at least one item are required.' })
     return
   }
-  const { label, description, items } = parsed.data
+  const { label, description, items, measurementFields, logFields } = parsed.data
   const shortLabel = label.length <= 24 ? label : label.split(' ').slice(0, 3).join(' ')
 
   const updated = await prisma.checklistTemplate.update({
@@ -175,19 +236,32 @@ templatesRouter.patch('/:type', requireAuth, requireRole('supervisor'), async (r
           sortOrder: index,
         })),
       },
+      measurementFields: {
+        deleteMany: {},
+        create: (measurementFields ?? []).map((f, index) => ({
+          groupLabel: f.groupLabel,
+          rowLabel: f.rowLabel,
+          columnLabel: f.columnLabel,
+          unit: f.unit,
+          fieldType: f.fieldType,
+          sortOrder: index,
+        })),
+      },
+      logFields: {
+        deleteMany: {},
+        create: (logFields ?? []).map((f, index) => ({
+          groupLabel: f.groupLabel,
+          columnLabel: f.columnLabel,
+          fieldType: f.fieldType,
+          unit: f.unit,
+          sortOrder: index,
+        })),
+      },
     },
-    include: { items: { orderBy: { sortOrder: 'asc' } } },
+    include: templateInclude,
   })
 
-  const result: ChecklistTemplateDef = {
-    type: updated.type,
-    label: updated.label,
-    shortLabel: updated.shortLabel,
-    description: updated.description,
-    items: updated.items.map((i) => ({ id: i.itemKey, label: i.label })),
-  }
-
-  res.json(result)
+  res.json(toTemplateDef(updated))
 })
 
 templatesRouter.delete('/:type', requireAuth, requireRole('supervisor'), async (req, res) => {

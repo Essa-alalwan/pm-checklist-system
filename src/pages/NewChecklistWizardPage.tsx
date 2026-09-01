@@ -22,8 +22,10 @@ import { StepJobInfo } from '../components/checklist/wizard/StepJobInfo'
 import { StepChecklistItems } from '../components/checklist/wizard/StepChecklistItems'
 import { StepMeasurementsLvAcMotor } from '../components/checklist/wizard/StepMeasurementsLvAcMotor'
 import { StepMeasurementsGenerator } from '../components/checklist/wizard/StepMeasurementsGenerator'
+import { StepMeasurementsGeneric } from '../components/checklist/wizard/StepMeasurementsGeneric'
 import { StepRemarksSignature } from '../components/checklist/wizard/StepRemarksSignature'
 import { StepReview } from '../components/checklist/wizard/StepReview'
+import type { GenericDraft } from '../features/wizard/draftFactory'
 
 type StepId = 'job-info' | 'items' | 'measurements' | 'signoff' | 'review'
 
@@ -44,7 +46,8 @@ interface WizardState {
 
 function WizardInner({ template }: { template: ChecklistTemplate }) {
   const type = template.type
-  const hasMeasurements = (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(type)
+  const isBuiltIn = (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(type)
+  const hasMeasurements = isBuiltIn || template.measurementFields.length > 0 || template.logFields.length > 0
   const steps = useMemo(() => buildSteps(hasMeasurements), [hasMeasurements])
   const navigate = useNavigate()
   const { name, signatureDataUrl: savedSignature } = useSession()
@@ -71,13 +74,24 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
   const { step, data } = state
   const currentStepId = steps[step].id
 
-  // A draft resumed from localStorage (e.g. started before a signature was
-  // ever saved to the account) can be sitting with a blank signature even
-  // though the account now has one — backfill it once, without touching a
-  // draft that already has a real signature drawn into it.
+  // A draft resumed from localStorage can be missing fields that didn't
+  // exist yet when it was saved — a signature saved to the account after
+  // the draft was started, or (for a custom checklist type) `measurements`/
+  // `logs` if the draft predates that type getting a Measurements step at
+  // all. Backfill everything missing in one combined patch (not separate
+  // setState calls, which would clobber each other off the same stale
+  // closure) so the Measurements step doesn't crash indexing into `undefined`.
   useEffect(() => {
+    const patch: Partial<ChecklistDraft> = {}
     if (!data.signatureDataUrl && savedSignature) {
-      setState({ step, data: { ...data, signatureDataUrl: savedSignature } as ChecklistDraft })
+      patch.signatureDataUrl = savedSignature
+    }
+    if (!isBuiltIn) {
+      if (!('measurements' in data)) (patch as Partial<GenericDraft>).measurements = {}
+      if (!('logs' in data)) (patch as Partial<GenericDraft>).logs = {}
+    }
+    if (Object.keys(patch).length > 0) {
+      setState({ step, data: { ...data, ...patch } as ChecklistDraft })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -179,8 +193,17 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
       {currentStepId === 'measurements' &&
         (data.type === 'lv-ac-motor' ? (
           <StepMeasurementsLvAcMotor draft={data as LvAcMotorDraft} onChange={(patch) => patchData(patch)} />
-        ) : (
+        ) : data.type === 'generator' ? (
           <StepMeasurementsGenerator draft={data as GeneratorDraft} onChange={(patch) => patchData(patch)} />
+        ) : (
+          <StepMeasurementsGeneric
+            measurementFields={template.measurementFields}
+            measurements={(data as GenericDraft).measurements}
+            onChange={(measurements) => patchData({ measurements } as Partial<ChecklistDraft>)}
+            logFields={template.logFields}
+            logs={(data as GenericDraft).logs}
+            onLogsChange={(logs) => patchData({ logs } as Partial<ChecklistDraft>)}
+          />
         ))}
       {currentStepId === 'signoff' && (
         <StepRemarksSignature draft={data} signatureError={blockingMessage ? signatureError : null} onChange={patchData} />

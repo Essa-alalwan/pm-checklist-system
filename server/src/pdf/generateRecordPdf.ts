@@ -1,7 +1,8 @@
 import fs from 'fs'
 import path from 'path'
 import PDFDocument from 'pdfkit'
-import type { ChecklistRecord, GeneratorChecklist, LvAcMotorChecklist, NumericOrNA } from '../types/checklist'
+import type { ChecklistRecord, ChecklistTemplateLogFieldDef, ChecklistTemplateMeasurementFieldDef, GeneratorChecklist, GenericChecklist, LvAcMotorChecklist, NumericOrNA } from '../types/checklist'
+import { groupMeasurementFields, tableCellKey } from '../measurements/pivot'
 
 const INK = '#111827'
 const MUTED = '#6b7280'
@@ -32,7 +33,15 @@ function formatDateTime(iso: string): string {
 function formatMeasurement(value: NumericOrNA | undefined, unit: string): string {
   if (value === undefined) return '—'
   if (value === 'N/A') return 'N/A'
-  return `${value} ${unit}`
+  return unit ? `${value} ${unit}` : String(value)
+}
+
+// Dispatches on the field's declared type — a text field's value is printed
+// as-is, a number field goes through the NumericOrNA/unit formatting above.
+function formatCellValue(value: string | NumericOrNA | undefined, field: { fieldType: 'text' | 'number'; unit?: string }): string {
+  if (value === undefined) return '—'
+  if (field.fieldType === 'text') return String(value)
+  return formatMeasurement(value as NumericOrNA, field.unit ?? '')
 }
 
 function decodeImageBuffer(dataUrl: string): { buffer: Buffer; kind: 'png' | 'jpeg' } | null {
@@ -239,7 +248,12 @@ function addFootersAndPageNumbers(doc: PDFKit.PDFDocument, record: ChecklistReco
   }
 }
 
-export function generateRecordPdf(record: ChecklistRecord, templateLabel: string): PDFKit.PDFDocument {
+export function generateRecordPdf(
+  record: ChecklistRecord,
+  templateLabel: string,
+  measurementFields: ChecklistTemplateMeasurementFieldDef[] = [],
+  logFields: ChecklistTemplateLogFieldDef[] = [],
+): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: 'A4', margin: PAGE_MARGIN, bufferPages: true })
 
   drawHeader(doc, record, templateLabel)
@@ -349,6 +363,62 @@ export function generateRecordPdf(record: ChecklistRecord, templateLabel: string
       ],
       3,
     )
+  } else if (measurementFields.length > 0 || logFields.length > 0) {
+    const gen = record as GenericChecklist
+    drawSectionHeading(doc, 'Measurements')
+    for (const group of groupMeasurementFields(measurementFields)) {
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(INK).text(group.groupLabel)
+      doc.moveDown(0.3)
+      if (group.kind === 'table') {
+        const colWidth = contentWidth(doc) / (group.columns.length + 1)
+        drawTable(
+          doc,
+          [{ header: '', width: colWidth }, ...group.columns.map((c) => ({ header: c, width: colWidth }))],
+          group.rows.map((row) => [
+            row,
+            ...group.columns.map((col) => {
+              const field = group.cellsByKey.get(tableCellKey(row, col))
+              if (!field) return '—'
+              return formatCellValue(gen.measurements[field.id], field)
+            }),
+          ]),
+        )
+      } else {
+        drawKeyValueGrid(
+          doc,
+          group.fields.map((f) => [f.columnLabel, formatCellValue(gen.measurements[f.id], f)]),
+          3,
+        )
+      }
+    }
+
+    const logGroups = new Map<string, ChecklistTemplateLogFieldDef[]>()
+    for (const f of logFields) {
+      if (!logGroups.has(f.groupLabel)) logGroups.set(f.groupLabel, [])
+      logGroups.get(f.groupLabel)!.push(f)
+    }
+    for (const [groupLabel, fields] of logGroups) {
+      const rows = gen.logs?.[groupLabel] ?? []
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(INK).text(groupLabel)
+      doc.moveDown(0.3)
+      if (rows.length === 0) {
+        doc.font('Helvetica').fontSize(8.5).fillColor(MUTED).text('No entries recorded.')
+        doc.moveDown(0.5)
+      } else {
+        const colWidth = contentWidth(doc) / fields.length
+        drawTable(
+          doc,
+          fields.map((f) => ({ header: f.columnLabel, width: colWidth })),
+          rows.map((row) =>
+            fields.map((f) => {
+              const v = row[f.id]
+              if (v === undefined) return '—'
+              return f.fieldType === 'text' ? String(v) : formatMeasurement(v as NumericOrNA, f.unit ?? '')
+            }),
+          ),
+        )
+      }
+    }
   }
 
   if (record.remarks) {

@@ -23,7 +23,8 @@ function formatDateTime(iso: string) {
 export function ChecklistDetailView({ record }: { record: DetailSource }) {
   const { getTemplate } = useTemplates()
   const template = getTemplate(record.type)
-  const hasMeasurements = (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(record.type)
+  const isBuiltIn = (BUILT_IN_CHECKLIST_TYPES as readonly string[]).includes(record.type)
+  const hasMeasurements = isBuiltIn || (template?.measurementFields.length ?? 0) > 0 || (template?.logFields.length ?? 0) > 0
   const Icon = record.type === 'generator' ? Zap : record.type === 'lv-ac-motor' ? CircleGauge : ClipboardList
   const status = 'status' in record ? record.status : undefined
   const flagged = record.items.some((i) => i.status === 'flagged')
@@ -97,7 +98,7 @@ export function ChecklistDetailView({ record }: { record: DetailSource }) {
             <h2 className="text-sm font-semibold text-text">Measurements</h2>
           </CardHeader>
           <CardBody>
-            <MeasurementsView source={record} />
+            <MeasurementsView source={record} measurementFields={template?.measurementFields} logFields={template?.logFields} />
           </CardBody>
         </Card>
       )}

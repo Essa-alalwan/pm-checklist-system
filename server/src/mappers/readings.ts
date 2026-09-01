@@ -1,4 +1,4 @@
-import type { GeneratorChecklist, LvAcMotorChecklist, NumericOrNA } from '../types/checklist'
+import type { ChecklistTemplateMeasurementFieldDef, GeneratorChecklist, LogRowValue, LvAcMotorChecklist, NumericOrNA } from '../types/checklist'
 
 export interface ReadingInput {
   key: string
@@ -159,4 +159,39 @@ export function parseGeneratorReadings(rows: ReadingRow[], recordId: string): Ge
     ipbHumidityPercent: find('ipbHumidityPercent'),
     gtRunningHours: find('gtRunningHours'),
   }
+}
+
+// Custom checklist types (anything not lv-ac-motor/generator) have no named
+// struct fields — the template itself defines what fields exist. `key` is
+// the ChecklistTemplateMeasurementField's own id, so no name collisions are
+// possible across fields/groups the way there would be with a shared string key.
+// A field's own fieldType decides how its value is stored: 'text' fields go
+// straight into textValue as-is (no NumericOrNA "N/A" semantics), 'number'
+// fields use the same split every other measurement uses.
+export function buildGenericReadings(fields: ChecklistTemplateMeasurementFieldDef[], measurements: LogRowValue): ReadingInput[] {
+  return fields.map((field, index) => {
+    const raw = measurements[field.id]
+    return {
+      key: field.id,
+      groupLabel: field.groupLabel ?? null,
+      unit: field.unit ?? null,
+      sortOrder: index,
+      ...(field.fieldType === 'text' ? { value: null, textValue: raw === undefined ? null : String(raw) } : splitNumericOrNA(raw as NumericOrNA | undefined)),
+    }
+  })
+}
+
+export function parseGenericReadings(rows: ReadingRow[], fields: ChecklistTemplateMeasurementFieldDef[]): LogRowValue {
+  const fieldById = new Map(fields.map((f) => [f.id, f]))
+  const result: LogRowValue = {}
+  for (const row of rows) {
+    const field = fieldById.get(row.key)
+    if (field?.fieldType === 'text') {
+      if (row.textValue !== null) result[row.key] = row.textValue
+      continue
+    }
+    const value = readNumericOrNA(row)
+    if (value !== undefined) result[row.key] = value
+  }
+  return result
 }

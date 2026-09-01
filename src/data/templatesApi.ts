@@ -1,5 +1,5 @@
 import { apiFetch, apiUpload } from './apiClient'
-import type { ChecklistTemplate } from '../types/checklist'
+import type { ChecklistTemplate, ChecklistTemplateLogFieldDef, ChecklistTemplateMeasurementFieldDef } from '../types/checklist'
 
 export interface ParsedChecklistDocx {
   suggestedLabel: string
@@ -17,6 +17,8 @@ export interface CreateChecklistTemplateInput {
   label: string
   description?: string
   items: string[]
+  measurementFields?: Omit<ChecklistTemplateMeasurementFieldDef, 'id'>[]
+  logFields?: Omit<ChecklistTemplateLogFieldDef, 'id'>[]
 }
 
 export async function createChecklistTemplate(input: CreateChecklistTemplateInput): Promise<ChecklistTemplate> {
