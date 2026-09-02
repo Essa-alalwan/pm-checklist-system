@@ -5,12 +5,14 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardBody } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { TemplateItemsEditor, type TemplateReviewState } from '../components/templates/TemplateItemsEditor'
+import { TemplateFieldsEditor, type TemplateFieldsState } from '../components/templates/TemplateFieldsEditor'
+import { TableSuggestionsPanel } from '../components/templates/TableSuggestionsPanel'
 import { useTemplates } from '../context/TemplatesContext'
 import { useSession } from '../context/SessionContext'
-import { parseChecklistDocx, createChecklistTemplate } from '../data/templatesApi'
+import { parseChecklistDocx, createChecklistTemplate, type DetectedTableGroup, type ParsedChecklistDocx } from '../data/templatesApi'
 import { ApiError } from '../data/apiClient'
 
-type ReviewState = TemplateReviewState
+const emptyFields: TemplateFieldsState = { measurementFields: [], logFields: [] }
 
 export default function UploadChecklistTypePage() {
   const navigate = useNavigate()
@@ -20,7 +22,11 @@ export default function UploadChecklistTypePage() {
 
   const [parsing, setParsing] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
-  const [review, setReview] = useState<ReviewState | null>(null)
+  const [review, setReview] = useState<TemplateReviewState | null>(null)
+  const [fields, setFields] = useState<TemplateFieldsState>(emptyFields)
+  const [tableGroups, setTableGroups] = useState<DetectedTableGroup[]>([])
+  const [acceptedTableIndexes, setAcceptedTableIndexes] = useState<Set<number>>(new Set())
+  const [discardedTableIndexes, setDiscardedTableIndexes] = useState<Set<number>>(new Set())
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -30,14 +36,39 @@ export default function UploadChecklistTypePage() {
     setParsing(true)
     setParseError(null)
     try {
-      const parsed = await parseChecklistDocx(file)
-      setReview({ label: parsed.suggestedLabel, description: parsed.suggestedDescription, items: parsed.items })
+      const parsed: ParsedChecklistDocx = await parseChecklistDocx(file)
+      setReview({ label: parsed.suggestedLabel, description: parsed.suggestedDescription, items: parsed.items.map((i) => i.text) })
+      setFields(emptyFields)
+      setTableGroups(parsed.tableGroups)
+      setAcceptedTableIndexes(new Set())
+      setDiscardedTableIndexes(new Set())
     } catch (err) {
       setParseError(err instanceof ApiError ? err.message : 'Could not read this document. Please try again.')
     } finally {
       setParsing(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  const handleAcceptTable = (group: DetectedTableGroup) => {
+    setFields((prev) => ({
+      measurementFields: group.classification === 'grid' && group.measurementFields ? [...prev.measurementFields, ...group.measurementFields] : prev.measurementFields,
+      logFields: group.classification === 'log' && group.logFields ? [...prev.logFields, ...group.logFields] : prev.logFields,
+    }))
+    setAcceptedTableIndexes((prev) => new Set(prev).add(group.sourceTableIndex))
+  }
+
+  const handleDiscardTable = (sourceTableIndex: number) => {
+    setDiscardedTableIndexes((prev) => new Set(prev).add(sourceTableIndex))
+  }
+
+  const startOver = () => {
+    setReview(null)
+    setFields(emptyFields)
+    setTableGroups([])
+    setAcceptedTableIndexes(new Set())
+    setDiscardedTableIndexes(new Set())
+    setSubmitError(null)
   }
 
   const handleSubmit = async () => {
@@ -50,7 +81,13 @@ export default function UploadChecklistTypePage() {
     setSubmitting(true)
     setSubmitError(null)
     try {
-      await createChecklistTemplate({ label: review.label.trim(), description: review.description.trim(), items })
+      await createChecklistTemplate({
+        label: review.label.trim(),
+        description: review.description.trim(),
+        items,
+        measurementFields: fields.measurementFields,
+        logFields: fields.logFields,
+      })
       refetch()
       navigate('/checklists/new')
     } catch (err) {
@@ -77,7 +114,7 @@ export default function UploadChecklistTypePage() {
 
       <PageHeader
         title="Upload New Checklist Type"
-        description="Upload the department's existing Word-doc checklist. Review the detected items before it becomes a real checklist type."
+        description="Upload the department's existing Word-doc checklist. Review the detected items and tables before it becomes a real checklist type — nothing is saved automatically."
       />
 
       {!review ? (
@@ -89,7 +126,7 @@ export default function UploadChecklistTypePage() {
             <div>
               <p className="text-sm font-semibold text-text">Upload a .docx checklist document</p>
               <p className="mt-1 max-w-sm text-sm text-text-muted">
-                Numbered inspection items will be detected automatically. You'll be able to review and edit everything before it's saved.
+                Numbered items and tables will be detected automatically. You'll be able to review and edit everything before it's saved.
               </p>
             </div>
             <input ref={fileInputRef} type="file" accept=".docx" onChange={handleFileChange} className="hidden" aria-label="Upload .docx checklist" />
@@ -105,8 +142,18 @@ export default function UploadChecklistTypePage() {
           </CardBody>
         </Card>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
           <TemplateItemsEditor review={review} onChange={setReview} />
+
+          <TableSuggestionsPanel
+            tableGroups={tableGroups}
+            acceptedTableIndexes={acceptedTableIndexes}
+            discardedTableIndexes={discardedTableIndexes}
+            onAccept={handleAcceptTable}
+            onDiscard={handleDiscardTable}
+          />
+
+          <TemplateFieldsEditor fields={fields} onChange={setFields} />
 
           {submitError && (
             <p role="alert" className="text-sm font-medium text-critical">
@@ -115,7 +162,7 @@ export default function UploadChecklistTypePage() {
           )}
 
           <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => setReview(null)}>
+            <Button variant="ghost" onClick={startOver}>
               Start over
             </Button>
             <Button onClick={handleSubmit} loading={submitting}>

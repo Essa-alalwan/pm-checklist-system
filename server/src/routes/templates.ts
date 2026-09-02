@@ -1,10 +1,10 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { z } from 'zod'
 import { prisma } from '../db'
 import { requireAuth, requireRole } from '../middleware/requireAuth'
 import { parseChecklistDocx } from '../parsing/parseChecklistDocx'
 import { BUILT_IN_CHECKLIST_TYPES, type ChecklistTemplateDef, type ChecklistType } from '../types/checklist'
+import { createTemplateSchema, parsedChecklistSchema, updateTemplateSchema } from '../schemas/templateFields'
 
 export const templatesRouter = Router()
 
@@ -104,33 +104,15 @@ templatesRouter.post('/parse-docx', requireAuth, requireRole('supervisor'), uplo
       res.status(422).json({ error: "Could not find any numbered checklist items in this document. You can still add items manually." })
       return
     }
-    res.json(parsed)
+    const validated = parsedChecklistSchema.safeParse(parsed)
+    if (!validated.success) {
+      res.status(422).json({ error: 'This document parsed into an unexpected shape. Please add items/fields manually.' })
+      return
+    }
+    res.json(validated.data)
   } catch {
     res.status(422).json({ error: 'Could not read this document. Make sure it is a valid .docx file.' })
   }
-})
-
-const measurementFieldSchema = z.object({
-  groupLabel: z.string().optional(),
-  rowLabel: z.string().optional(),
-  columnLabel: z.string().min(1),
-  unit: z.string().optional(),
-  fieldType: z.enum(['text', 'number']).default('number'),
-})
-
-const logFieldSchema = z.object({
-  groupLabel: z.string().min(1),
-  columnLabel: z.string().min(1),
-  fieldType: z.enum(['text', 'number']),
-  unit: z.string().optional(),
-})
-
-const createTemplateSchema = z.object({
-  label: z.string().min(1),
-  description: z.string().optional(),
-  items: z.array(z.string().min(1)).min(1),
-  measurementFields: z.array(measurementFieldSchema).optional(),
-  logFields: z.array(logFieldSchema).optional(),
 })
 
 templatesRouter.post('/', requireAuth, requireRole('supervisor'), async (req, res) => {
@@ -181,14 +163,6 @@ templatesRouter.post('/', requireAuth, requireRole('supervisor'), async (req, re
   })
 
   res.status(201).json(toTemplateDef(template))
-})
-
-const updateTemplateSchema = z.object({
-  label: z.string().min(1),
-  description: z.string().optional(),
-  items: z.array(z.string().min(1)).min(1),
-  measurementFields: z.array(measurementFieldSchema).optional(),
-  logFields: z.array(logFieldSchema).optional(),
 })
 
 function isBuiltIn(type: string): boolean {

@@ -1,49 +1,11 @@
 import * as cheerio from 'cheerio'
 import mammoth from 'mammoth'
+import { classifyTable } from './classifyTable'
+import { tableToMatrix, type TableMatrix } from './tableExtraction'
+import { cleanItemText, isRealSentence } from './textUtils'
+import type { DetectedItem, DetectedTableGroup, ParsedChecklist } from './parsedChecklistTypes'
 
-export interface ParsedChecklist {
-  suggestedLabel: string
-  suggestedDescription: string
-  items: string[]
-}
-
-// The paper forms end each item with a fill-in-the-blank status placeholder,
-// e.g. "(                    )" or "( N/A )" once filled in — strip it if present.
-// Real documents pad it with long runs of spaces/tabs, hence the \s* either side.
-const TRAILING_PLACEHOLDER = /\(\s*(?:done|n\/?a|flagged|yes|no)?\s*\)\s*$/i
-
-function cleanItemText(raw: string): string {
-  const collapsed = raw.replace(/\s+/g, ' ').trim()
-  return collapsed.replace(TRAILING_PLACEHOLDER, '').trim()
-}
-
-function isRealSentence(text: string): boolean {
-  // Guards against stray fragments (table cells, bookmark anchors, empty
-  // placeholder-only paragraphs) — a real checklist item is a sentence, not
-  // mostly digits/punctuation/whitespace.
-  const letters = text.replace(/[^a-zA-Z]/g, '')
-  return letters.length >= 8
-}
-
-/**
- * Primary strategy: most real-world checklists use Word's built-in numbered-
- * list button, not literal "1." text — the number is formatting metadata,
- * invisible to plain text extraction. Converting to HTML makes mammoth
- * resolve that numbering into real <ol><li> elements we can read directly,
- * regardless of how many separate <ol> blocks the document ends up split
- * into (Word quirks can break a single visual list into several).
- */
-async function extractItemsFromLists(buffer: Buffer): Promise<string[]> {
-  const { value: html } = await mammoth.convertToHtml({ buffer })
-  const $ = cheerio.load(html)
-
-  const items: string[] = []
-  $('li').each((_, el) => {
-    const text = cleanItemText($(el).text())
-    if (isRealSentence(text)) items.push(text)
-  })
-  return items
-}
+export type { ParsedChecklist } from './parsedChecklistTypes'
 
 // Matches "1. Clean the low voltage motor." / "12) Check the ..." — a leading
 // number, a period or paren, then real sentence text.
@@ -51,23 +13,82 @@ const NUMBERED_LINE = /^\s*(\d{1,3})[.)]\s+(.{8,})$/
 
 /**
  * Fallback strategy: documents where the numbers really are typed as literal
- * text (no Word list formatting at all).
+ * text (no Word list formatting, and no items-shaped table either).
  */
-async function extractItemsFromNumberedText(buffer: Buffer): Promise<string[]> {
-  const { value: rawText } = await mammoth.extractRawText({ buffer })
+function extractItemsFromNumberedText(rawText: string): DetectedItem[] {
   const lines = rawText
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
 
-  const items: string[] = []
+  const items: DetectedItem[] = []
   for (const line of lines) {
     const match = line.match(NUMBERED_LINE)
     if (!match) continue
     const text = cleanItemText(match[2])
-    if (isRealSentence(text)) items.push(text)
+    if (isRealSentence(text)) items.push({ text, source: 'list' })
   }
   return items
+}
+
+function previewRows(matrix: TableMatrix, maxRows = 4): string[][] {
+  return matrix.slice(0, maxRows).map((row) => row.map((cell) => cell.text))
+}
+
+/**
+ * Walks the document body in source order, so list-items and tables come
+ * out interleaved the same way they read in the original document (rather
+ * than two independent passes with no ordering guarantee between them).
+ * <ol>/<ul> elements contribute items directly; <table> elements are
+ * expanded into a real row/column matrix (respecting rowspan/colspan) and
+ * classified as an items table, a fixed measurement grid, an open-ended
+ * log register, or skipped (job-info header / fully-populated reference
+ * table / not confidently classifiable).
+ */
+function walkBody(html: string): { items: DetectedItem[]; tableGroups: DetectedTableGroup[] } {
+  const $ = cheerio.load(html)
+  const items: DetectedItem[] = []
+  const tableGroups: DetectedTableGroup[] = []
+  let tableIndex = 0
+
+  $('body')
+    .children()
+    .each((_, el) => {
+      const tag = el.tagName?.toLowerCase()
+
+      if (tag === 'ol' || tag === 'ul') {
+        $(el)
+          .find('li')
+          .each((__, li) => {
+            const text = cleanItemText($(li).text())
+            if (isRealSentence(text)) items.push({ text, source: 'list' })
+          })
+        return
+      }
+
+      if (tag === 'table') {
+        const index = tableIndex
+        tableIndex += 1
+        const matrix = tableToMatrix($(el), $)
+        const classification = classifyTable(matrix, index)
+
+        if (classification.kind === 'items') {
+          for (const text of classification.items) items.push({ text, source: 'table', sourceTableIndex: index })
+          return
+        }
+
+        const base = { sourceTableIndex: index, previewRows: previewRows(matrix) }
+        if (classification.kind === 'grid') {
+          tableGroups.push({ ...base, classification: 'grid', groupLabel: classification.groupLabel, measurementFields: classification.measurementFields })
+        } else if (classification.kind === 'log') {
+          tableGroups.push({ ...base, classification: 'log', groupLabel: classification.groupLabel, logFields: classification.logFields })
+        } else {
+          tableGroups.push({ ...base, classification: classification.kind, groupLabel: `Table ${index + 1}` })
+        }
+      }
+    })
+
+  return { items, tableGroups }
 }
 
 function guessTitleFromFilename(originalFilename?: string): string | undefined {
@@ -87,9 +108,12 @@ function guessTitleFromBody(preambleLines: string[]): string {
 }
 
 export async function parseChecklistDocx(buffer: Buffer, originalFilename?: string): Promise<ParsedChecklist> {
-  let items = await extractItemsFromLists(buffer)
+  const { value: html } = await mammoth.convertToHtml({ buffer })
+  let { items, tableGroups } = walkBody(html)
+
   if (items.length === 0) {
-    items = await extractItemsFromNumberedText(buffer)
+    const { value: rawText } = await mammoth.extractRawText({ buffer })
+    items = extractItemsFromNumberedText(rawText)
   }
 
   const { value: rawText } = await mammoth.extractRawText({ buffer })
@@ -102,7 +126,7 @@ export async function parseChecklistDocx(buffer: Buffer, originalFilename?: stri
     // the document's header block is only one or two lines long. Matched by
     // prefix, not equality — the raw line can carry extra trailing junk
     // (e.g. a placeholder's stray unmatched "(") that the item text doesn't.
-    .filter((line) => !items.some((item) => cleanItemText(line).startsWith(item)))
+    .filter((line) => !items.some((item) => cleanItemText(line).startsWith(item.text)))
     .slice(0, 5)
 
   const suggestedLabel = guessTitleFromFilename(originalFilename) ?? guessTitleFromBody(preambleLines)
@@ -116,5 +140,5 @@ export async function parseChecklistDocx(buffer: Buffer, originalFilename?: stri
     .trim()
     .slice(0, 200)
 
-  return { suggestedLabel, suggestedDescription, items }
+  return { suggestedLabel, suggestedDescription, items, tableGroups }
 }

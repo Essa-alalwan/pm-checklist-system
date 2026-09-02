@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Button } from '../components/ui/Button'
 import { TemplateItemsEditor, type TemplateReviewState } from '../components/templates/TemplateItemsEditor'
+import { TemplateFieldsEditor, type TemplateFieldsState } from '../components/templates/TemplateFieldsEditor'
 import { useTemplates } from '../context/TemplatesContext'
 import { useSession } from '../context/SessionContext'
 import { updateChecklistTemplate } from '../data/templatesApi'
@@ -18,6 +19,21 @@ function EditChecklistTypeInner({ template }: { template: ChecklistTemplate }) {
     description: template.description,
     items: template.items.map((i) => i.label),
   })
+  const [fields, setFields] = useState<TemplateFieldsState>({
+    measurementFields: template.measurementFields.map((f) => ({
+      groupLabel: f.groupLabel,
+      rowLabel: f.rowLabel,
+      columnLabel: f.columnLabel,
+      unit: f.unit,
+      fieldType: f.fieldType,
+    })),
+    logFields: template.logFields.map((f) => ({
+      groupLabel: f.groupLabel,
+      columnLabel: f.columnLabel,
+      fieldType: f.fieldType,
+      unit: f.unit,
+    })),
+  })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -30,7 +46,13 @@ function EditChecklistTypeInner({ template }: { template: ChecklistTemplate }) {
     setSubmitting(true)
     setSubmitError(null)
     try {
-      await updateChecklistTemplate(template.type, { label: review.label.trim(), description: review.description.trim(), items })
+      await updateChecklistTemplate(template.type, {
+        label: review.label.trim(),
+        description: review.description.trim(),
+        items,
+        measurementFields: fields.measurementFields,
+        logFields: fields.logFields,
+      })
       refetch()
       navigate('/checklists/new')
     } catch (err) {
@@ -54,6 +76,10 @@ function EditChecklistTypeInner({ template }: { template: ChecklistTemplate }) {
       <PageHeader title={`Edit "${template.label}"`} description="Changes apply immediately once saved." />
 
       <TemplateItemsEditor review={review} onChange={setReview} />
+
+      <div className="mt-5">
+        <TemplateFieldsEditor fields={fields} onChange={setFields} />
+      </div>
 
       {submitError && (
         <p role="alert" className="mt-4 text-sm font-medium text-critical">

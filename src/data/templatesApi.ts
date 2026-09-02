@@ -1,10 +1,28 @@
 import { apiFetch, apiUpload } from './apiClient'
 import type { ChecklistTemplate, ChecklistTemplateLogFieldDef, ChecklistTemplateMeasurementFieldDef } from '../types/checklist'
 
+export interface DetectedItem {
+  text: string
+  source: 'list' | 'table'
+  sourceTableIndex?: number
+}
+
+export type TableClassificationKind = 'grid' | 'log' | 'skipped-reference' | 'skipped-header' | 'ambiguous'
+
+export interface DetectedTableGroup {
+  sourceTableIndex: number
+  classification: TableClassificationKind
+  groupLabel: string
+  measurementFields?: Omit<ChecklistTemplateMeasurementFieldDef, 'id'>[]
+  logFields?: Omit<ChecklistTemplateLogFieldDef, 'id'>[]
+  previewRows: string[][]
+}
+
 export interface ParsedChecklistDocx {
   suggestedLabel: string
   suggestedDescription: string
-  items: string[]
+  items: DetectedItem[]
+  tableGroups: DetectedTableGroup[]
 }
 
 export async function parseChecklistDocx(file: File): Promise<ParsedChecklistDocx> {
