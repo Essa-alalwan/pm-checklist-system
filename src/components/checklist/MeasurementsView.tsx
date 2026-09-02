@@ -186,10 +186,10 @@ function GenericMeasurements({
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-faint">{group.groupLabel}</h3>
           {group.kind === 'table' ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[360px] text-sm">
+              <table className="w-full min-w-[360px] border-separate border-spacing-0 text-sm">
                 <thead>
                   <tr className="text-left text-xs font-medium text-text-faint">
-                    <th className="pb-2 font-medium"></th>
+                    <th className="sticky left-0 z-10 bg-surface pb-2 font-medium"></th>
                     {group.columns.map((col) => (
                       <th key={col} className="pb-2 font-medium">
                         {col}
@@ -199,12 +199,12 @@ function GenericMeasurements({
                 </thead>
                 <tbody className="font-mono text-text tabular-nums">
                   {group.rows.map((row) => (
-                    <tr key={row} className="border-t border-border">
-                      <td className="py-2 font-semibold">{row}</td>
+                    <tr key={row}>
+                      <td className="sticky left-0 z-10 border-t border-border bg-surface py-2 font-semibold">{row}</td>
                       {group.columns.map((col) => {
                         const field = group.cellsByKey.get(tableCellKey(row, col))
                         return (
-                          <td key={col} className="py-2">
+                          <td key={col} className="border-t border-border py-2">
                             {field ? (measurements[field.id] ?? '—') : ''}
                           </td>
                         )

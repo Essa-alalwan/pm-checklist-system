@@ -57,7 +57,7 @@ export function StepMeasurementsGeneric({
                 <table className="w-full min-w-[420px] border-separate border-spacing-y-2 text-sm">
                   <thead>
                     <tr className="text-left text-xs font-medium text-text-faint">
-                      <th className="min-w-[9rem] font-medium"></th>
+                      <th className="sticky left-0 z-10 min-w-[9rem] bg-surface font-medium"></th>
                       {group.columns.map((col) => (
                         <th key={col} className="font-medium">
                           {col}
@@ -68,7 +68,7 @@ export function StepMeasurementsGeneric({
                   <tbody>
                     {group.rows.map((row) => (
                       <tr key={row}>
-                        <td className="py-1 pr-2 font-mono font-semibold text-text">{row}</td>
+                        <td className="sticky left-0 z-10 bg-surface py-1 pr-2 font-mono font-semibold text-text">{row}</td>
                         {group.columns.map((col) => {
                           const field = group.cellsByKey.get(tableCellKey(row, col))
                           return (
