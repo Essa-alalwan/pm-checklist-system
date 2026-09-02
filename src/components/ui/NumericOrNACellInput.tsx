@@ -20,7 +20,6 @@ export function NumericOrNACellInput({ value, onChange, ariaLabel, className }: 
       className={clsx(inputClasses, 'min-h-10 font-mono tabular-nums', className)}
       value={raw}
       onChange={handleChange}
-      placeholder="N/A"
       aria-label={ariaLabel}
     />
   )

@@ -17,6 +17,7 @@ import { useDraft } from '../hooks/useDraft'
 import { useSession } from '../context/SessionContext'
 import { useCreateChecklist } from '../hooks/useCreateChecklist'
 import { Button } from '../components/ui/Button'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { WizardShell } from '../components/checklist/wizard/WizardShell'
 import { StepJobInfo } from '../components/checklist/wizard/StepJobInfo'
 import { StepChecklistItems } from '../components/checklist/wizard/StepChecklistItems'
@@ -70,6 +71,7 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
   const { draft: state, setDraft: setState, saveState, clearDraft } = useDraft<WizardState>(`draft:${type}`, initial)
   const [showErrors, setShowErrors] = useState(false)
   const [blockingMessage, setBlockingMessage] = useState<string | null>(null)
+  const [showStartOverConfirm, setShowStartOverConfirm] = useState(false)
 
   const { step, data } = state
   const currentStepId = steps[step].id
@@ -134,6 +136,13 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
     setState({ step: Math.max(step - 1, 0), data })
   }
 
+  const handleStartOver = () => {
+    setShowErrors(false)
+    setBlockingMessage(null)
+    setState(initial)
+    setShowStartOverConfirm(false)
+  }
+
   const handleSubmit = async () => {
     if (signatureError) {
       setBlockingMessage(signatureError)
@@ -149,67 +158,78 @@ function WizardInner({ template }: { template: ChecklistTemplate }) {
   }
 
   return (
-    <WizardShell
-      title={template.label}
-      subtitle={template.description}
-      steps={steps}
-      currentStepIndex={step}
-      saveState={saveState}
-      onStepClick={goToStep}
-      footer={
-        <div className="flex flex-col gap-2">
-          {blockingMessage && (
-            <p role="alert" className="text-sm font-medium text-critical">
-              {blockingMessage}
-            </p>
-          )}
-          {submitError && (
-            <p role="alert" className="text-sm font-medium text-critical">
-              {submitError}
-            </p>
-          )}
-          <div className="flex items-center justify-between gap-3">
-            <Button variant="ghost" onClick={handleBack} disabled={step === 0}>
-              <ArrowLeft className="size-4" aria-hidden="true" />
-              Back
-            </Button>
-            {step < steps.length - 1 ? (
-              <Button onClick={handleNext}>
-                Next
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Button>
-            ) : (
-              <Button onClick={handleSubmit} loading={submitting}>
-                <Send className="size-4" aria-hidden="true" />
-                Submit Checklist
-              </Button>
+    <>
+      <WizardShell
+        title={template.label}
+        subtitle={template.description}
+        steps={steps}
+        currentStepIndex={step}
+        saveState={saveState}
+        onStepClick={goToStep}
+        onStartOver={() => setShowStartOverConfirm(true)}
+        footer={
+          <div className="flex flex-col gap-2">
+            {blockingMessage && (
+              <p role="alert" className="text-sm font-medium text-critical">
+                {blockingMessage}
+              </p>
             )}
+            {submitError && (
+              <p role="alert" className="text-sm font-medium text-critical">
+                {submitError}
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <Button variant="ghost" onClick={handleBack} disabled={step === 0}>
+                <ArrowLeft className="size-4" aria-hidden="true" />
+                Back
+              </Button>
+              {step < steps.length - 1 ? (
+                <Button onClick={handleNext}>
+                  Next
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Button>
+              ) : (
+                <Button onClick={handleSubmit} loading={submitting}>
+                  <Send className="size-4" aria-hidden="true" />
+                  Submit Checklist
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      }
-    >
-      {currentStepId === 'job-info' && <StepJobInfo draft={data} errors={showErrors ? jobInfoErrors : {}} onChange={patchData} />}
-      {currentStepId === 'items' && <StepChecklistItems items={data.items} onChange={(items) => patchData({ items })} />}
-      {currentStepId === 'measurements' &&
-        (data.type === 'lv-ac-motor' ? (
-          <StepMeasurementsLvAcMotor draft={data as LvAcMotorDraft} onChange={(patch) => patchData(patch)} />
-        ) : data.type === 'generator' ? (
-          <StepMeasurementsGenerator draft={data as GeneratorDraft} onChange={(patch) => patchData(patch)} />
-        ) : (
-          <StepMeasurementsGeneric
-            measurementFields={template.measurementFields}
-            measurements={(data as GenericDraft).measurements}
-            onChange={(measurements) => patchData({ measurements } as Partial<ChecklistDraft>)}
-            logFields={template.logFields}
-            logs={(data as GenericDraft).logs}
-            onLogsChange={(logs) => patchData({ logs } as Partial<ChecklistDraft>)}
-          />
-        ))}
-      {currentStepId === 'signoff' && (
-        <StepRemarksSignature draft={data} signatureError={blockingMessage ? signatureError : null} onChange={patchData} />
-      )}
-      {currentStepId === 'review' && <StepReview draft={data} />}
-    </WizardShell>
+        }
+      >
+        {currentStepId === 'job-info' && <StepJobInfo draft={data} errors={showErrors ? jobInfoErrors : {}} onChange={patchData} />}
+        {currentStepId === 'items' && <StepChecklistItems items={data.items} onChange={(items) => patchData({ items })} />}
+        {currentStepId === 'measurements' &&
+          (data.type === 'lv-ac-motor' ? (
+            <StepMeasurementsLvAcMotor draft={data as LvAcMotorDraft} onChange={(patch) => patchData(patch)} />
+          ) : data.type === 'generator' ? (
+            <StepMeasurementsGenerator draft={data as GeneratorDraft} onChange={(patch) => patchData(patch)} />
+          ) : (
+            <StepMeasurementsGeneric
+              measurementFields={template.measurementFields}
+              measurements={(data as GenericDraft).measurements}
+              onChange={(measurements) => patchData({ measurements } as Partial<ChecklistDraft>)}
+              logFields={template.logFields}
+              logs={(data as GenericDraft).logs}
+              onLogsChange={(logs) => patchData({ logs } as Partial<ChecklistDraft>)}
+            />
+          ))}
+        {currentStepId === 'signoff' && (
+          <StepRemarksSignature draft={data} signatureError={blockingMessage ? signatureError : null} onChange={patchData} />
+        )}
+        {currentStepId === 'review' && <StepReview draft={data} />}
+      </WizardShell>
+      <ConfirmDialog
+        open={showStartOverConfirm}
+        title="Start over?"
+        description="This clears everything you've entered for this checklist and returns to the first step."
+        confirmLabel="Start Over"
+        onConfirm={handleStartOver}
+        onCancel={() => setShowStartOverConfirm(false)}
+      />
+    </>
   )
 }
 

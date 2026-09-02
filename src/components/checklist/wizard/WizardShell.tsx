@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { clsx } from 'clsx'
-import { Check, CloudCheck, Loader2, X } from 'lucide-react'
+import { Check, CloudCheck, Loader2, RotateCcw, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { SaveState } from '../../../hooks/useDraft'
 
@@ -16,6 +16,7 @@ interface WizardShellProps {
   currentStepIndex: number
   saveState: SaveState
   onStepClick?: (index: number) => void
+  onStartOver?: () => void
   footer: ReactNode
   children: ReactNode
 }
@@ -40,15 +41,30 @@ function SaveIndicator({ state }: { state: SaveState }) {
   return <span className="text-xs text-text-faint">&nbsp;</span>
 }
 
-export function WizardShell({ title, subtitle, steps, currentStepIndex, saveState, onStepClick, footer, children }: WizardShellProps) {
+export function WizardShell({ title, subtitle, steps, currentStepIndex, saveState, onStepClick, onStartOver, footer, children }: WizardShellProps) {
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-3xl flex-col md:min-h-0">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <Link to="/checklists/new" className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-text-faint hover:text-text-muted">
-            <X className="size-3.5" aria-hidden="true" />
-            Cancel
-          </Link>
+          <div className="mb-3 flex items-center gap-2">
+            <Link
+              to="/checklists/new"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border-strong px-3 text-sm font-medium text-text hover:border-brand hover:text-brand-strong"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+              Cancel
+            </Link>
+            {onStartOver && (
+              <button
+                type="button"
+                onClick={onStartOver}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border-strong px-3 text-sm font-medium text-text hover:border-brand hover:text-brand-strong"
+              >
+                <RotateCcw className="size-3.5" aria-hidden="true" />
+                Start Over
+              </button>
+            )}
+          </div>
           <h1 className="text-xl font-semibold tracking-tight text-text sm:text-2xl">{title}</h1>
           <p className="mt-0.5 text-sm text-text-muted">{subtitle}</p>
         </div>
